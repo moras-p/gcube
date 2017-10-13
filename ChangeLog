@@ -1,12 +1,11 @@
-
   0.5   - compilation under windows should now be much easier. use dev-cpp
-					and the supplied project files.
-				- various compatibility improvements
+			and the supplied project files.
+		- various compatibility improvements
         - fixed some ugly bugs
-				- consequent video frames can now be saved as files and later
-				  converted into video using tga2avi script
-					(needs mencoder from mplayer package)
-				- thpview now faster and with sound support.
+		- consequent video frames can now be saved as files and later
+			converted into video using tga2avi script
+			(needs mencoder from mplayer package)
+		- thpview now faster and with sound support.
 
   0.4   - better interrupt handling and dsp emulation
         - input should work in more games now
