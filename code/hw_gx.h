@@ -58,6 +58,7 @@
 #define VCD_T2MIDX										(CP_VCD_LO & 0x008)
 #define VCD_T1MIDX										(CP_VCD_LO & 0x004)
 #define VCD_T0MIDX										(CP_VCD_LO & 0x002)
+#define VCD_TMIDX(n)									(CP_VCD_LO & (2 << (n)))
 #define VCD_PMIDX											(CP_VCD_LO & 0x001)
 
 #define VAT_BYTE_DEQUANT(X)						((CP_VAT_A(X) >> 30) & 0x01)
@@ -141,6 +142,8 @@
 #define XF_MATRIX_INDEX_1							(XF  (0x1019))
 
 #define XF_TEX(X)											(XF  (0x1040 + X))
+#define TC_EMBOSS_LIGHT(X)						((XF_TEX (X) >> 15) & 7)
+#define TC_EMBOSS_SOURCE(X)						((XF_TEX (X) >> 12) & 7)
 #define TC_SOURCE_ROW(X)							((XF_TEX (X) >> 7) & 0x1f)
 #define TC_TEXGEN_TYPE(X)							((XF_TEX (X) >> 4) & 7)
 #define TC_PROJECTION(X)							(XF_TEX (X) & 2)
@@ -161,6 +164,9 @@
 #define MIDX_TEX2											((CP_MATRIX_INDEX_0 >> 18) & 0x3f)
 #define MIDX_TEX1											((CP_MATRIX_INDEX_0 >> 12) & 0x3f)
 #define MIDX_TEX0											((CP_MATRIX_INDEX_0 >>  6) & 0x3f)
+#define MIDX_TEXH(n)									((CP_MATRIX_INDEX_1 >> (((n) + 1)*6)) & 0x3f)
+#define MIDX_TEXL(n)									((CP_MATRIX_INDEX_0 >> (((n) + 1)*6)) & 0x3f)
+#define MIDX_TEX(n)										((n >= 4) ? MIDX_TEXH (n - 4) : MIDX_TEXL (n))
 #define MIDX_GEO											((CP_MATRIX_INDEX_0 >>  0) & 0x3f)
 
 
@@ -219,25 +225,64 @@
 #define BP_SCISSORS_BOTTOM_RIGHT			(BP (0x21))
 #define BP_SCISSORS_OFFSET						(BP (0x59))
 
+#define BP_TEV_FOG_PARAM_0						(BP (0xee))
+#define BP_TEV_FOG_PARAM_1						(BP (0xef))
+#define BP_TEV_FOG_PARAM_2						(BP (0xf0))
+#define BP_TEV_FOG_PARAM_3						(BP (0xf1))
 #define BP_TEV_FOG_COLOR							(BP (0xf2))
 #define BP_TEV_ALPHAFUNC							(BP (0xf3))
 
 #define BP_MASK												(BP (0xfe))
 
+#define IND_MTXA(X)										(BP (0x06 + 3*X))
+#define IND_MTXB(X)										(BP (0x07 + 3*X))
+#define IND_MTXC(X)										(BP (0x08 + 3*X))
+#define IND_MS0(X)										((IND_MTXA(X) >> 22) & 3)
+#define IND_MS1(X)										((IND_MTXB(X) >> 22) & 3)
+#define IND_MS2(X)										((IND_MTXC(X) >> 22) & 3)
+#define IND_MF(X)											((IND_MTXC(X) >> 11) & 0x7ff)
+#define IND_ME(X)											((IND_MTXC(X) >>  0) & 0x7ff)
+#define IND_MD(X)											((IND_MTXB(X) >> 11) & 0x7ff)
+#define IND_MC(X)											((IND_MTXB(X) >>  0) & 0x7ff)
+#define IND_MB(X)											((IND_MTXA(X) >> 11) & 0x7ff)
+#define IND_MA(X)											((IND_MTXA(X) >>  0) & 0x7ff)
+#define IND_MSX(X)										(IND_MS0(X) | (IND_MS1(X) << 2) | (IND_MS2(X) << 4))
+#define IND_MSF(X)										((float) (1ULL << IND_MSX((X))) / 0x00020000)
+
+#define BP_CMD(X)											(BP (0x10 + X))
+#define IND_FB(X)											((BP_CMD (X) >> 20) & 1)
+#define IND_LD(X)											((BP_CMD (X) >> 19) & 1)
+#define IND_TW(X)											((BP_CMD (X) >> 16) & 7)
+#define IND_SW(X)											((BP_CMD (X) >> 13) & 7)
+#define IND_M(X)											((BP_CMD (X) >>  9) & 15)
+#define IND_BS(X)											((BP_CMD (X) >>  7) & 3)
+#define IND_BIAS(X)										((BP_CMD (X) >>  4) & 7)
+#define IND_FMT(X)										((BP_CMD (X) >>  2) & 3)
+#define IND_BT(X)											((BP_CMD (X) >>  0) & 3)
+#define TEV_STAGE_DIRECT(X)						(!(BP_CMD (X) & 0x00ffffff))
+
+#define BP_SS(X)											(BP (0x25 + X))
+#define RAS_TS(X)											((BP_SS (X/2) >> ((X%2) * 8 + 4)) & 15)
+#define RAS_SS(X)											((BP_SS (X/2) >> ((X%2) * 8)) & 15)
+
+#define BP_IREF												(BP (0x27))
+#define RAS_CI(X)											((BP_IREF >> (X * 6 + 3)) & 7)
+#define RAS_BI(X)											((BP_IREF >> (X * 6)) & 7)
+
 #define BP_TREF(X)										(BP (0x28 + X))
 #define BP_TS(X)											(BP_TREF (X/2) >> ((X & 1) * 12))
-#define TS_COLOR(X)										((BP_TS (X) >> 7) & 7)
-#define TS_ENABLED(X)									(BP_TS (X) & (1 << 6))
-#define TS_TEXCOORD(X)								((BP_TS (X) >> 3) & 7)
-#define TS_TEXMAP(X)									((BP_TS (X) >> 0) & 7)
+#define RAS_CC(X)											((BP_TS (X) >> 7) & 7)
+#define RAS_TC(X)											((BP_TS (X) >> 3) & 7)
+#define RAS_TE(X)											((BP_TS (X) & (1 << 6))>0)
+#define RAS_TI(X)											((BP_TS (X) >> 0) & 7)
 
 #define BP_COLOR_ENV(X)								(BP (0xc0 + X*2))
 #define BP_ALPHA_ENV(X)								(BP (0xc1 + X*2))
 
 #define C_COLOR_DEST(X)								((BP_COLOR_ENV (X) >> 22) & 0x03)
 #define C_COLOR_SCALE(X)							((BP_COLOR_ENV (X) >> 20) & 0x03)
-#define C_COLOR_CLAMP(X)							(BP_COLOR_ENV (X) & (1 << 19))
-#define C_COLOR_OP(X)									(BP_COLOR_ENV (X) & (1 << 18))
+#define C_COLOR_CLAMP(X)							((BP_COLOR_ENV (X) >> 19) & 0x01)
+#define C_COLOR_OP(X)									((BP_COLOR_ENV (X) >> 18) & 0x01)
 #define C_COLOR_BIAS(X)								((BP_COLOR_ENV (X) >> 16) & 0x03)
 #define C_COLOR_A(X)									((BP_COLOR_ENV (X) >> 12) & 0x0f)
 #define C_COLOR_B(X)									((BP_COLOR_ENV (X) >>  8) & 0x0f)
@@ -246,33 +291,56 @@
 
 #define C_ALPHA_DEST(X)								((BP_ALPHA_ENV (X) >> 22) & 3)
 #define C_ALPHA_SCALE(X)							((BP_ALPHA_ENV (X) >> 20) & 3)
-#define C_ALPHA_CLAMP(X)							(BP_ALPHA_ENV (X) & (1 << 19))
-#define C_ALPHA_OP(X)									(BP_ALPHA_ENV (X) & (1 << 18))
+#define C_ALPHA_CLAMP(X)							((BP_ALPHA_ENV (X) >> 19) & 1)
+#define C_ALPHA_OP(X)									((BP_ALPHA_ENV (X) >> 18) & 1)
 #define C_ALPHA_BIAS(X)								((BP_ALPHA_ENV (X) >> 16) & 3)
 #define C_ALPHA_A(X)									((BP_ALPHA_ENV (X) >> 13) & 7)
 #define C_ALPHA_B(X)									((BP_ALPHA_ENV (X) >> 10) & 7)
 #define C_ALPHA_C(X)									((BP_ALPHA_ENV (X) >>  7) & 7)
 #define C_ALPHA_D(X)									((BP_ALPHA_ENV (X) >>  4) & 7)
-#define C_ALPHA_TSWAP(X)							((BP_ALPHA_ENV (X) >>  2) & 3)
-#define C_ALPHA_RSWAP(X)							((BP_ALPHA_ENV (X) >>  0) & 3)
+
+#define C_TSWAP(X)										((BP_ALPHA_ENV (X) >>  2) & 3)
+#define C_RSWAP(X)										((BP_ALPHA_ENV (X) >>  0) & 3)
+
+#define TEV_REGL(n)										(BP (0xe0 + n*2))
+#define TEV_REGH(n)										(BP (0xe1 + n*2))
+#define TEV_REG_RA_TYPE(n)						((TEV_REGL(n) >> 23) & 1)
+#define TEV_REG_BG_TYPE(n)						((TEV_REGH(n) >> 23) & 1)
+#define TEV_REG_A(n)									((TEV_REGL(n) >> 12) & 0x07ff)
+#define TEV_REG_R(n)									(TEV_REGL(n) & 0x07ff)
+#define TEV_REG_G(n)									((TEV_REGH(n) >> 12) & 0x07ff)
+#define TEV_REG_B(n)									(TEV_REGH(n) & 0x07ff)
+
+#define TEV_Z_ENV0										(BP (0xf4))
+#define TEV_Z_ENV1										(BP (0xf5))
+#define TEV_Z_BIAS										(EXTS (24, TEV_Z_ENV0 & 0xffffff))
+#define TEV_Z_OP											((TEV_Z_ENV1 >> 2) & 3)
+#define TEV_Z_FORMAT									((TEV_Z_ENV1 >> 0) & 3)
+
+#define Z_OP_ADD												1
+#define Z_OP_REPLACE										2
 
 #define GX_BIAS_COMPARE									3
 #define GX_BIAS_SUBHALF									2
 #define GX_BIAS_ADDHALF									1
 #define GX_BIAS_ZERO										0
 
-#define BP_KSEL(X)										(BP (0xf6 + X))
+#define BP_KSEL(X)										(BP (0xf6 + (X)))
 #define KSEL_A1(X)										((BP_KSEL (X) >> 19) & 0x1f)
 #define KSEL_C1(X)										((BP_KSEL (X) >> 14) & 0x1f)
 #define KSEL_A0(X)										((BP_KSEL (X) >>  9) & 0x1f)
 #define KSEL_C0(X)										((BP_KSEL (X) >>  4) & 0x1f)
-#define KSEL_SWAP2(X)									((BP_KSEL (X) >>  2) & 0x03)
-#define KSEL_SWAP1(X)									((BP_KSEL (X) >>  0) & 0x03)
+#define KSEL_XBA(X)										BP_KSEL (X*2 + 1)
+#define KSEL_XRG(X)										BP_KSEL (X*2)
+#define KSEL_SWAP_A(X)								((KSEL_XBA (X) >>  2) & 0x03)
+#define KSEL_SWAP_B(X)								((KSEL_XBA (X) >>  0) & 0x03)
+#define KSEL_SWAP_G(X)								((KSEL_XRG (X) >>  2) & 0x03)
+#define KSEL_SWAP_R(X)								((KSEL_XRG (X) >>  0) & 0x03)
 #define KSEL_A(X)											((BP_KSEL (X/2) >> ((X%2 * 10) + 9)) & 0x1f)
 #define KSEL_C(X)											((BP_KSEL (X/2) >> ((X%2 * 10) + 4)) & 0x1f)
 
 #define CULL_MODE											((BP_GENMODE >> 14) & 3)
-#define BP_BUMPMAPS										((BP_GENMODE >> 16) & 0x07)
+#define BP_INDSTAGES									((BP_GENMODE >> 16) & 0x07)
 #define BP_TEVSTAGES									((BP_GENMODE >> 10) & 0x0f)
 #define BP_COLORS											((BP_GENMODE >>  4) & 0x1f)
 #define BP_TEXGENS										((BP_GENMODE >>  0) & 0x0f)
@@ -303,12 +371,25 @@
 #define TEV_FOG_COLOR_R								((BP_TEV_FOG_COLOR >> 16) & 0xff)
 #define TEV_FOG_COLOR_G								((BP_TEV_FOG_COLOR >>  8) & 0xff)
 #define TEV_FOG_COLOR_B								((BP_TEV_FOG_COLOR >>  0) & 0xff)
+#define TEV_FOG_B_SHF									(BP_TEV_FOG_PARAM_2 & 0x1f)
+#define TEV_FOG_FSEL									((BP_TEV_FOG_PARAM_3 >> 21) & 7)
+#define GX_FOG_LINEAR									2
+#define GX_FOG_EXP										4
+#define GX_FOG_EXP2										5
+#define GX_FOG_BXP										6
+#define GX_FOG_BXP2										7
+
 
 #define TEV_ALPHAFUNC_LOGIC						((BP_TEV_ALPHAFUNC >> 22) & 0x03)
 #define TEV_ALPHAFUNC_OP1							((BP_TEV_ALPHAFUNC >> 19) & 0x07)
 #define TEV_ALPHAFUNC_OP0							((BP_TEV_ALPHAFUNC >> 16) & 0x07)
 #define TEV_ALPHAFUNC_A1							((BP_TEV_ALPHAFUNC >>  8) & 0xff)
 #define TEV_ALPHAFUNC_A0							((BP_TEV_ALPHAFUNC >>  0) & 0xff)
+#define TEV_ALPHAFUNC_OP(n)						((BP_TEV_ALPHAFUNC >> (16 + n*3)) & 0x07)
+#define TEV_ALPHAFUNC_A(n)						((BP_TEV_ALPHAFUNC >> (n*8)) & 0xff)
+
+#define ALPHAOP_FALSE									0
+#define ALPHAOP_TRUE									7
 
 #define COPY_CLEAR_A									((BP_COPY_CLEAR_AR >> 8) & 0xff)
 #define COPY_CLEAR_R									((BP_COPY_CLEAR_AR >> 0) & 0xff)
@@ -322,6 +403,11 @@
 #define COPY_EXECUTE_GAMMA						((BP_COPY_EXECUTE >> 7) & 3)
 #define COPY_XFB_FORMAT_INTENSITY			(BP_COPY_EXECUTE  & 0x8000)
 #define COPY_XFB_FORMAT								((BP_COPY_EXECUTE >> 3) & 0x0f)
+#define COPY_EXECUTE_CLAMP_TOP				(BP_COPY_EXECUTE & 2)
+#define COPY_EXECUTE_CLAMP_BOTTOM			(BP_COPY_EXECUTE & 1)
+
+#define PIXEL_FORMAT									(BP_PE_CONTROL & 7)
+#define PF_Z24												3
 
 #define COPY_Z_BUFFER									(!(BP_PE_CONTROL & (1 << 6)))
 
@@ -484,6 +570,7 @@
 #define GX_TOGGLE_FORCE_MAX_ANISO					9
 #define GX_TOGGLE_TC_INVALIDATE_ENABLED		10
 #define GX_TOGGLE_ENGINE									11
+#define GX_TOGGLE_FOG											12
 #define GX_TOGGLE_FIX_FLICKERING					20
 #define GX_TOGGLE_FIX_BLENDING						21
 
@@ -493,10 +580,6 @@
 #define GX_LINEAR								4
 #define GX_LIN_MIP_NEAR					5
 #define GX_LIN_MIP_LIN					6
-
-#define TEV_FOG_PARAM3				(BP (0xf1))
-#define TEV_FOG_FSEL					((TEV_FOG_PARAM3 >> 21) & 7)
-#define GX_FOG_LINEAR					2
 
 // GX_NEAR is 0, GX_LINEAR is 4, the rest is mipmapped
 #define TEX_IS_MIPMAPPED(X)			(TEX_MODE_MIN_FILTER (index) & 3)
@@ -562,6 +645,8 @@ typedef struct
 	int use_gl_mipmaps;
 	int tc_invalidate_enabled;
 	int new_engine;
+	int use_shaders;
+	int fog_enabled;
 	
 	// only from command line
 	int flicker_fix;
@@ -571,15 +656,24 @@ typedef struct
 
 extern GXState gxs;
 extern GXSwitches gxswitches;
-extern TextureCache texcache;
+extern TextureCache texcache, texcache_rt;
 extern TextureTag *texactive[8];
-extern TextureTag tag_render_target;
+extern TextureTag tag_render_target[2];
+extern unsigned int ewidth, eheight;
 
 void gx_init (void);
 void gx_reinit (void);
 void gx_set_max_anisotropy (float a);
 int gx_parse_list (__u32 address, __u32 length);
 int gx_switch (int sw);
+
+#define FIFO_U8				MEM
+#define FIFO_S8				MEMS
+#define FIFO_U16			MEMR16
+#define FIFO_S16			MEMSR16
+#define FIFO_U32			MEMR32
+#define FIFO_U32_NS		MEM32
+#define FIFO_F				MEMRF
 
 
 #endif // __HW_GX_H

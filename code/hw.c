@@ -286,18 +286,18 @@ void install_exception_handlers (void)
 
 	for (i = 0; i < sizeof (reset_handler) / 4; i++)
 	{
-		MEM_WWORD (EXCEPTION_SYSTEM_RESET + i*4, reset_handler[i]);
+		MEMWR32 (EXCEPTION_SYSTEM_RESET + i*4, reset_handler[i]);
 		// dol reload
-		MEM_WWORD (0x80001800 + i*4, reset_handler[i]);
+		MEMWR32 (0x80001800 + i*4, reset_handler[i]);
 	}
 
 	for (i = 0; i < sizeof (decrementer_handler) / 4; i++)
-		MEM_WWORD (EXCEPTION_DECREMENTER + i*4, decrementer_handler[i]);
+		MEMWR32 (EXCEPTION_DECREMENTER + i*4, decrementer_handler[i]);
 
 	for (i = 0; i < sizeof (empty_handler) / 4; i++)
 	{
-		MEM_WWORD (EXCEPTION_SYSTEM_CALL + i*4, empty_handler[i]);
-		MEM_WWORD (EXCEPTION_EXTERNAL + i*4, empty_handler[i]);
+		MEMWR32 (EXCEPTION_SYSTEM_CALL + i*4, empty_handler[i]);
+		MEMWR32 (EXCEPTION_EXTERNAL + i*4, empty_handler[i]);
 	}
 }
 
@@ -306,12 +306,12 @@ void hw_set_video_mode (int country_code)
 {
 	if (country_code == 'E' || country_code == 'J')
 	{
-		MEM_WWORD (MEM_TV_MODE, TV_MODE_NTSC);
+		MEMWR32 (MEM_TV_MODE, TV_MODE_NTSC);
 		vi_set_video_mode (TV_MODE_NTSC);
 	}
 	else
 	{
-		MEM_WWORD (MEM_TV_MODE, TV_MODE_PAL);
+		MEMWR32 (MEM_TV_MODE, TV_MODE_PAL);
 		vi_set_video_mode (TV_MODE_PAL);
 	}
 
@@ -350,25 +350,25 @@ void hw_init (void)
 
 	gx_init ();
 
-//	MEM_WWORD (MEM_CONSOLE_TYPE, CONSOLE_TYPE_LATEST_PB);
-	MEM_WWORD (MEM_CONSOLE_TYPE, CONSOLE_TYPE_LATEST_DEVKIT);
+//	MEMWR32 (MEM_CONSOLE_TYPE, CONSOLE_TYPE_LATEST_PB);
+	MEMWR32 (MEM_CONSOLE_TYPE, CONSOLE_TYPE_LATEST_DEVKIT);
 
-	MEM_WWORD (MEM_HEAP_BOTTOM, ARENA_LO);
-	MEM_WWORD (MEM_HEAP_TOP, ARENA_HI);
+	MEMWR32 (MEM_HEAP_BOTTOM, ARENA_LO);
+	MEMWR32 (MEM_HEAP_TOP, ARENA_HI);
 	
-	MEM_WWORD (MEM_MEM_SIZE, MEM_SIZE);
-	MEM_WWORD (MEM_SIM_MEM_SIZE, MEM_SIZE);
+	MEMWR32 (MEM_MEM_SIZE, MEM_SIZE);
+	MEMWR32 (MEM_SIM_MEM_SIZE, MEM_SIZE);
 
-	MEM_WWORD (MEM_BUS_CLOCK_SPEED, BUS_CLOCK_SPEED);
-	MEM_WWORD (MEM_CPU_CLOCK_SPEED, CPU_CLOCK_SPEED);
+	MEMWR32 (MEM_BUS_CLOCK_SPEED, BUS_CLOCK_SPEED);
+	MEMWR32 (MEM_CPU_CLOCK_SPEED, CPU_CLOCK_SPEED);
 
-	MEM_WWORD (MEM_BOOT_MAGIC, MEM_BOOT_MAGIC_NORMAL);
+	MEMWR32 (MEM_BOOT_MAGIC, MEM_BOOT_MAGIC_NORMAL);
 	
 //	install_exception_handlers ();
 	// default exception handlers (rfi)
-	MEM_WWORD (EXCEPTION_SYSTEM_RESET, 0x4c000064);
-	MEM_WWORD (EXCEPTION_DSI, 0x4c000064);
-	MEM_WWORD (EXCEPTION_EXTERNAL, 0x4c000064);
-	MEM_WWORD (EXCEPTION_DECREMENTER, 0x4c000064);
-	MEM_WWORD (EXCEPTION_SYSTEM_CALL, 0x4c000064);
+	MEMWR32 (EXCEPTION_SYSTEM_RESET, 0x4c000064);
+	MEMWR32 (EXCEPTION_DSI, 0x4c000064);
+	MEMWR32 (EXCEPTION_EXTERNAL, 0x4c000064);
+	MEMWR32 (EXCEPTION_DECREMENTER, 0x4c000064);
+	MEMWR32 (EXCEPTION_SYSTEM_CALL, 0x4c000064);
 }

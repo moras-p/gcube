@@ -22,14 +22,33 @@
  *         
  */
 
-#include "hw_gx.h"
 #include <SDL/SDL_opengl.h>
+#include "hw_gx.h"
 
 
 __s32 (*gpop[0x100]) (__u32 mem);
 
 GXState gxs;
 GXSwitches gxswitches;
+static int ignore_bad_displaylist = TRUE;
+
+
+// needs 'end' passed to gpopcodes
+/*
+#ifdef GDEBUG
+# define GPOPCODE_SIZE(X)\
+	({\
+			if ((X) + mem > end)\
+			{\
+				DEBUG (EVENT_LOG_GX, "....  command needs %d bytes, only %d provided", X, end - mem);\
+				return -(X);\
+			}\
+	})
+#else
+# define GPOPCODE_SIZE(X)
+#endif
+*/
+# define GPOPCODE_SIZE(X)
 
 
 int gx_parse_list (__u32 start, __u32 length)
@@ -67,6 +86,8 @@ GPOPCODE (INVALID)
 
 GPOPCODE (NOP)
 {
+	GPOPCODE_SIZE (1);
+
 	DEBUG (EVENT_LOG_GX, "....  nop");
 
 	return 1;
@@ -75,9 +96,11 @@ GPOPCODE (NOP)
 
 GPOPCODE (LOAD_CP)
 {
-	DEBUG (EVENT_LOG_GX, "....  cp[%.2x] = %.8x", MEM (mem + 1), MEMR32 (mem + 2));
+	GPOPCODE_SIZE (6);
 
-	CP (MEM (mem + 1)) = MEMR32 (mem + 2);
+	DEBUG (EVENT_LOG_GX, "....  cp[%.2x] = %.8x", FIFO_U8 (mem + 1), FIFO_U32 (mem + 2));
+
+	CP (FIFO_U8 (mem + 1)) = FIFO_U32 (mem + 2);
 
 	return 6;
 }
@@ -85,13 +108,19 @@ GPOPCODE (LOAD_CP)
 
 GPOPCODE (LOAD_XF)
 {
-	__u32 n = MEMR16 (mem += 1) + 1;
-	__u32 a = MEMR16 (mem += 2);
+	__u32 n = FIFO_U16 (mem += 1) + 1;
+	__u32 a = FIFO_U16 (mem += 2);
 	int i;
 
-
+//#if 1
+	// primary check
+	GPOPCODE_SIZE (3);
+	// secondary check (with valid n)
+	GPOPCODE_SIZE (5 + n*4);
+//#else
 	if (EXCEEDES_LIST_BOUNDARY (mem, 5 + n*4))
 		return -(5 + n*4);
+//#endif
 
 	mem += 2;
 	if (a < 0x600)
@@ -99,9 +128,9 @@ GPOPCODE (LOAD_XF)
 		// load matrix
 		for (i = 0; i < n; i++, mem += 4)
 		{
-			DEBUG (EVENT_LOG_GX, "....  xfmat[%.4x] = %.2f", a + i, MEMRF (mem));
+			DEBUG (EVENT_LOG_GX, "....  xfmat[%.4x] = %.2f", a + i, FIFO_F (mem));
 
-			XFMAT (a + i) = MEMRF (mem);
+			XFMAT (a + i) = FIFO_F (mem);
 		}
 	}
 	else if (a < 0x800)
@@ -109,9 +138,9 @@ GPOPCODE (LOAD_XF)
 		// light memory
 		for (i = 0; i < n; i++, mem += 4)
 		{
-			DEBUG (EVENT_LOG_GX, "....  xfmat[%.4x] = %.8x", a + i, MEMR32 (mem));
+			DEBUG (EVENT_LOG_GX, "....  xfmat[%.4x] = %.8x", a + i, FIFO_U32 (mem));
 
-			XFMATB (a + i) = MEMR32 (mem);
+			XFMATB (a + i) = FIFO_U32 (mem);
 		}
 		{
 			int num = XFMAT_LIGHT_NUM (a);
@@ -125,26 +154,14 @@ GPOPCODE (LOAD_XF)
 	{
 		for (i = 0; i < n; i++, mem += 4)
 		{
-			DEBUG (EVENT_LOG_GX, "....  xf[%.4x] = %.8x", a + i, MEMR32 (mem));
+			DEBUG (EVENT_LOG_GX, "....  xf[%.4x] = %.8x", a + i, FIFO_U32 (mem));
 
-			XF (a + i) = MEMR32 (mem);
+			XF (a + i) = FIFO_U32 (mem);
 		}
 		
 		// set matrices
 		switch (a)
 		{
-			// Ambient 0
-			case 0x100a:
-				break;
-			
-			// Material 0
-			case 0x100c:
-				break;
-		
-			// Color 0 Control
-			case 0x100e:
-				break;
-		
 			// viewport
 			case 0x101a:
 			case 0x101b:
@@ -167,6 +184,8 @@ GPOPCODE (LOAD_XF)
 // invalidate vertex cache
 GPOPCODE (INVALIDATE_VCACHE)
 {
+	GPOPCODE_SIZE (1);
+
 	DEBUG (EVENT_LOG_GX, "....  invalidate vertex cache");
 
 	return 1;
@@ -176,16 +195,18 @@ GPOPCODE (INVALIDATE_VCACHE)
 GPOPCODE (LOAD_BP)
 {
 	__u32 mask = BP_MASK;
-	__u8 index = MEM (mem + 1);
+	__u8 index = FIFO_U8 (mem + 1);
 
 
-	DEBUG (EVENT_LOG_GX, "....  bp[%.2x] = %.6x", index, MEMR32 (mem + 1) & 0x00ffffff);
+	GPOPCODE_SIZE (5);
+
+	DEBUG (EVENT_LOG_GX, "....  bp[%.2x] = %.6x", index, FIFO_U32 (mem + 1) & 0x00ffffff);
 
 	// reset mask
-	if (BP_MASK != 0x00ffffff)
+//	if (BP_MASK != 0x00ffffff)
 		BP_MASK = 0x00ffffff;
 
-	BP (index) = (BP (index) &~ mask) | (MEMR32 (mem + 1) & mask);
+	BP (index) = (BP (index) &~ mask) | (FIFO_U32 (mem + 1) & mask);
 
 	switch (index)
 	{
@@ -194,6 +215,28 @@ GPOPCODE (LOAD_BP)
 			gx_set_cull_mode ();
 			break;
 		
+		// IND_MTX
+		case 0x06:
+		case 0x09:
+		case 0x0c:
+			gx_set_tev_indm_ab ((index - 6) / 3);
+			gx_set_tev_indscale ((index - 6) / 3);
+			break;
+
+		case 0x07:
+		case 0x0a:
+		case 0x0d:
+			gx_set_tev_indm_cd ((index - 7) / 3);
+			gx_set_tev_indscale ((index - 7) / 3);
+			break;
+
+		case 0x08:
+		case 0x0b:
+		case 0x0e:
+			gx_set_tev_indm_ef ((index - 8) / 3);
+			gx_set_tev_indscale ((index - 8) / 3);
+			break;
+
 		case 0x20:
 		case 0x21:
 			gx_set_scissors ();
@@ -221,6 +264,7 @@ GPOPCODE (LOAD_BP)
 
 		// PE_DONE
 		case 0x45:
+			DEBUG (EVENT_LOG_GX, "PE_DONE");
 			if (BP (0x45) & 1)
 				DEBUG (EVENT_STOP, "bit 0 in BP (0x45) set");
 
@@ -250,7 +294,7 @@ GPOPCODE (LOAD_BP)
 
 		// PE_COPY
 		case 0x52:
-//			gx_set_gamma ();
+			gx_set_gamma ();
 			gx_copy_efb ();
 			break;
 		
@@ -276,7 +320,7 @@ GPOPCODE (LOAD_BP)
 		case 0x81:
 		case 0x82:
 		case 0x83:
-			gx_set_texture_mode0 (MEM (mem + 1) & 3);
+			gx_set_texture_mode0 (FIFO_U8 (mem + 1) & 3);
 			break;
 
 		// TX_SETMODE1
@@ -284,26 +328,44 @@ GPOPCODE (LOAD_BP)
 		case 0x85:
 		case 0x86:
 		case 0x87:
-			gx_set_texture_mode1 ((MEM (mem + 1) >> 1) & 3);
+			gx_set_texture_mode1 ((FIFO_U8 (mem + 1) >> 1) & 3);
 			break;
 
 		case 0xa0:
 		case 0xa1:
 		case 0xa2:
 		case 0xa3:
-			gx_set_texture_mode0 ((MEM (mem + 1) & 3) + 4);
+			gx_set_texture_mode0 ((FIFO_U8 (mem + 1) & 3) + 4);
 			break;
 
 		case 0xa4:
 		case 0xa5:
 		case 0xa6:
 		case 0xa7:
-			gx_set_texture_mode1 (((MEM (mem + 1) >> 1) & 3) + 4);
+			gx_set_texture_mode1 (((FIFO_U8 (mem + 1) >> 1) & 3) + 4);
 			break;
 
-		// TEV_FOG_PARAM_3
+		// TEV_REGL
+		case 0xe0:
+		case 0xe2:
+		case 0xe4:
+		case 0xe6:
+			gx_set_tev_konst_ra ((index & 7) >> 1);
+			break;
+
+		// TEV_REGH
+		case 0xe1:
+		case 0xe3:
+		case 0xe5:
+		case 0xe7:
+			gx_set_tev_konst_bg ((index & 7) >> 1);
+			break;
+
+		case 0xee:
+		case 0xef:
+		case 0xf0:
 		case 0xf1:
-			gx_set_fog_param3 ();
+			gx_set_fog ();
 			break;
 
 		// TEV_FOG_COLOR
@@ -315,6 +377,29 @@ GPOPCODE (LOAD_BP)
 		case 0xf3:
 			gx_set_alphafunc ();
 			break;
+		
+		// BP MASK
+		// MaxPlay Classic Games Volume 1 has a strange version of GXSetCoPlanar
+		// other games execute it as two distinct bp register loads:
+		// 0x61, 0xfe080000 -> set bp mask register
+		// 0x61, (0x00000001 | (zfreeze_enabled << 19)) -> set gen mode
+		// but this game uses one bp load to fill 2 registers (?!):
+		// 0x61, 0xfe080000, (0x00000001 | (zfreeze_enabled << 19))
+		// this will generate invalid gx command, so here's a hack
+		case 0xfe:
+			{
+				__u32 next = FIFO_U32 (mem + 5);
+
+				if ((next &~ 0x00080000) == 0x00000001)
+				{
+					DEBUG (EVENT_LOG_GX, "..gx: odd GXSetCoPlanar hack");
+					BP (0x00) = (BP (0x00) &~ BP_MASK) | (next & BP_MASK);
+					BP_MASK = 0x00ffffff;
+					
+					return 9;
+				}
+			}
+			break;
 	}
 
 	return 5;
@@ -323,19 +408,21 @@ GPOPCODE (LOAD_BP)
 
 GPOPCODE (LOAD_INDEX)
 {
-	__u32 t = MEMR32 (mem + 1);
+	__u32 t = FIFO_U32 (mem + 1);
 	// index = t >> 16;
 	__u32 n = ((t >> 12) & 0x0f) + 1;
 	__u32 a = t & 0x0fff;
-	int i = ((MEM (mem) >> 3) & 3) + 0x0c;		// array index
+	int i = ((FIFO_U8 (mem) >> 3) & 3) + 0x0c;		// array index
 
+
+	GPOPCODE_SIZE (5);
 
 	DEBUG (EVENT_LOG_GX, "....  load xf indexed %c: index %d size %d address %.4x", 'a' + i, t >> 16, n, a);
 
 	mem = CP_ARRAY_BASE (i) + CP_ARRAY_STRIDE (i) * (t >> 16);
 	for (i = 0; i < n; i++, mem += 4)
 	{
-		XFMATB (a + i) = MEMR32 (mem);
+		XFMATB (a + i) = FIFO_U32 (mem);
 
 		DEBUG (EVENT_LOG_GX, "....   xfmat[%.4x] = %.2f", a + i, XFMAT (a + i));
 	}
@@ -346,22 +433,37 @@ GPOPCODE (LOAD_INDEX)
 
 GPOPCODE (CALL_DISPLAYLIST)
 {
-	__u32 addr = MEMR32 (mem + 1), size = MEMR32 (mem + 5);
+	__u32 addr = FIFO_U32 (mem + 1), size = FIFO_U32 (mem + 5);
 
+
+	GPOPCODE_SIZE (9);
 
 	DEBUG (EVENT_LOG_GX, "....  call displaylist %.8x of size %.8x", addr, size);
 
-	if (((addr & MEM_MASK) > MEM_SIZE) || (size > (CP_FIFO_END - CP_FIFO_BASE)) ||
-			 (addr & 31) || (size & 31))
+	if (((addr & MEM_MASK) > MEM_SIZE) || (addr & 31) || (size & 31))
 	{
 		DEBUG (EVENT_EFATAL, "..gx: trying to parse invalid list %.8x of size %.8x",
 						addr, size);
 
-		return -9;
+		if (ignore_bad_displaylist)
+			return 9;
+		else
+			return -9;
 	}
 
 	if (gx_parse_list (addr, size) < 0)
-		return -9;
+	{
+		if (ignore_bad_displaylist)
+		{
+			DEBUG (EVENT_LOG_GX, "..gx: problem with displaylist %.8x %.8x", addr, size);
+			return 9;
+		}
+		else
+		{
+			DEBUG (EVENT_EFATAL, "..gx: problem with displaylist %.8x %.8x", addr, size);
+			return -9;
+		}
+	}
 	else
 	{
 		DEBUG (EVENT_LOG_GX, "....  end of displaylist %.8x", addr);
@@ -372,57 +474,71 @@ GPOPCODE (CALL_DISPLAYLIST)
 
 GPOPCODE (DRAW_QUADS)
 {
-	DEBUG (EVENT_LOG_GX, "....  draw quads, %d verts", MEMR16 (mem + 1));
+	GPOPCODE_SIZE (3 + gx_list_size (FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7));
 
-	return 3 + gx_draw (mem + 3, GX_QUADS, MEMR16 (mem + 1), MEM (mem) & 7);
+	DEBUG (EVENT_LOG_GX, "....  draw quads, %d verts", FIFO_U16 (mem + 1));
+
+	return 3 + gx_draw (mem + 3, GX_QUADS, FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7);
 }
 
 
 GPOPCODE (DRAW_TRIANGLES)
 {
-	DEBUG (EVENT_LOG_GX, "....  draw triangles, %d verts", MEMR16 (mem + 1));
+	GPOPCODE_SIZE (3 + gx_list_size (FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7));
 
-	return 3 + gx_draw (mem + 3, GX_TRIANGLES, MEMR16 (mem + 1), MEM (mem) & 7);
+	DEBUG (EVENT_LOG_GX, "....  draw triangles, %d verts", FIFO_U16 (mem + 1));
+
+	return 3 + gx_draw (mem + 3, GX_TRIANGLES, FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7);
 }
 
 
 GPOPCODE (DRAW_TRIANGLE_STRIP)
 {
-	DEBUG (EVENT_LOG_GX, "....  draw triangle strip, %d verts", MEMR16 (mem + 1));
+	GPOPCODE_SIZE (3 + gx_list_size (FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7));
 
-	return 3 + gx_draw (mem + 3, GX_TRIANGLE_STRIP, MEMR16 (mem + 1), MEM (mem) & 7);
+	DEBUG (EVENT_LOG_GX, "....  draw triangle strip, %d verts", FIFO_U16 (mem + 1));
+
+	return 3 + gx_draw (mem + 3, GX_TRIANGLE_STRIP, FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7);
 }
 
 
 GPOPCODE (DRAW_TRIANGLE_FAN)
 {
-	DEBUG (EVENT_LOG_GX, "....  draw triangle fan, %d verts", MEMR16 (mem + 1));
+	GPOPCODE_SIZE (3 + gx_list_size (FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7));
 
-	return 3 + gx_draw (mem + 3, GX_TRIANGLE_FAN, MEMR16 (mem + 1), MEM (mem) & 7);
+	DEBUG (EVENT_LOG_GX, "....  draw triangle fan, %d verts", FIFO_U16 (mem + 1));
+
+	return 3 + gx_draw (mem + 3, GX_TRIANGLE_FAN, FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7);
 }
 
 
 GPOPCODE (DRAW_LINES)
 {
-	DEBUG (EVENT_LOG_GX, "....  draw lines, %d verts", MEMR16 (mem + 1));
+	GPOPCODE_SIZE (3 + gx_list_size (FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7));
 
-	return 3 + gx_draw (mem + 3, GX_LINES, MEMR16 (mem + 1), MEM (mem) & 7);
+	DEBUG (EVENT_LOG_GX, "....  draw lines, %d verts", FIFO_U16 (mem + 1));
+
+	return 3 + gx_draw (mem + 3, GX_LINES, FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7);
 }
 
 
 GPOPCODE (DRAW_LINE_STRIP)
 {
-	DEBUG (EVENT_LOG_GX, "....  draw line strip, %d verts", MEMR16 (mem + 1));
+	GPOPCODE_SIZE (3 + gx_list_size (FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7));
 
-	return 3 + gx_draw (mem + 3, GX_LINE_STRIP, MEMR16 (mem + 1), MEM (mem) & 7);
+	DEBUG (EVENT_LOG_GX, "....  draw line strip, %d verts", FIFO_U16 (mem + 1));
+
+	return 3 + gx_draw (mem + 3, GX_LINE_STRIP, FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7);
 }
 
 
 GPOPCODE (DRAW_POINTS)
 {
-	DEBUG (EVENT_LOG_GX, "....  draw points, %d verts", MEMR16 (mem + 1));
+	GPOPCODE_SIZE (3 + gx_list_size (FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7));
 
-	return 3 + gx_draw (mem + 3, GX_POINTS, MEMR16 (mem + 1), MEM (mem) & 7);
+	DEBUG (EVENT_LOG_GX, "....  draw points, %d verts", FIFO_U16 (mem + 1));
+
+	return 3 + gx_draw (mem + 3, GX_POINTS, FIFO_U16 (mem + 1), FIFO_U8 (mem) & 7);
 }
 
 
@@ -510,7 +626,14 @@ int gx_switch (int sw)
 
 		case GX_TOGGLE_ENGINE:
 			gxswitches.new_engine = !gxswitches.new_engine;
+			gxswitches.use_shaders = !gxswitches.use_shaders;
+			cg_enable (gxswitches.use_shaders);
+			texcache_remove_all ();
 			return gxswitches.new_engine;
+
+		case GX_TOGGLE_FOG:
+			gxswitches.fog_enabled = !gxswitches.fog_enabled;
+			return gxswitches.fog_enabled;
 
 		case GX_TOGGLE_FIX_FLICKERING:
 			gxswitches.flicker_fix = !gxswitches.flicker_fix;
@@ -537,7 +660,6 @@ void gx_reinit (void)
 	gx_set_cull_mode ();
 	gx_set_lpsize ();
 	gx_set_projection ();
-	gx_set_fog_param3 ();
 	gx_set_fog_color ();
 	gx_set_alphafunc ();
 }
@@ -549,8 +671,12 @@ void gx_init (void)
 
 
 	memset (&texcache, 0, sizeof (texcache));
+	memset (&texcache_rt, 0, sizeof (texcache));
 //	memset (&gxswitches, 0, sizeof (gxswitches));
-	gxswitches.new_engine = TRUE;
+	gxswitches.new_engine = gxswitches.use_shaders = TRUE;
+//	gxswitches.fog_enabled = TRUE;
+	// less texture converts
+//	gxswitches.use_gl_mipmaps = TRUE;
 
 	for (i = 0; i < 0x100; i++)
 		GPOP (i) = INVALID;

@@ -379,7 +379,7 @@ void ai_w32_aivr (__u32 addr, __u32 data)
 
 __u16 dsp_r16_direct (__u32 addr)
 {
-	DEBUG (EVENT_LOG_DSP, ".dsp: read  [%.4x] (%.4x)", addr & 0xffff, RDSP16 (addr));
+//	DEBUG (EVENT_LOG_DSP, ".dsp: read  [%.4x] (%.4x)", addr & 0xffff, RDSP16 (addr));
 
 	return RDSP16 (addr);
 }
@@ -387,14 +387,14 @@ __u16 dsp_r16_direct (__u32 addr)
 
 void dsp_w16_direct (__u32 addr, __u16 data)
 {
-	DEBUG (EVENT_LOG_DSP, ".dsp: write [%.4x] (%.4x) = %.4x", addr & 0xffff, RDSP16 (addr), data);
+//	DEBUG (EVENT_LOG_DSP, ".dsp: write [%.4x] (%.4x) = %.4x", addr & 0xffff, RDSP16 (addr), data);
 	RDSP16 (addr) = data;
 }
 
 
 __u32 dsp_r32_direct (__u32 addr)
 {
-	DEBUG (EVENT_LOG_DSP, ".dsp: read  [%.4x] (%.8x)", addr & 0xffff, RDSP32 (addr));
+//	DEBUG (EVENT_LOG_DSP, ".dsp: read  [%.4x] (%.8x)", addr & 0xffff, RDSP32 (addr));
 
 	return RDSP32 (addr);
 }
@@ -402,7 +402,7 @@ __u32 dsp_r32_direct (__u32 addr)
 
 void dsp_w32_direct (__u32 addr, __u32 data)
 {
-	DEBUG (EVENT_LOG_DSP, ".dsp: write [%.4x] (%.8x) = %.8x", addr & 0xffff, RDSP32 (addr), data);
+//	DEBUG (EVENT_LOG_DSP, ".dsp: write [%.4x] (%.8x) = %.8x", addr & 0xffff, RDSP32 (addr), data);
 	RDSP32 (addr) = data;
 }
 
@@ -433,8 +433,26 @@ void dsp_generate_interrupt (__u32 mask)
 
 void dsp_w16_csr (__u32 addr, __u16 data)
 {
+/*
 	DEBUG (EVENT_LOG_DSP, ".dsp: (%.8x) CSR = %.4x %s %s", PC, data,
 				 (data & DSP_CSR_RES) ? "reset" : "", (data & DSP_CSR_HALT) ? "halt" : "");
+*/
+	// int order: DSP AR AID
+	DEBUG (EVENT_LOG_DSP, ".dsp: (%.8x) CSR = %.4x | INT %d%d%d/%d%d%d ack %d%d%d + %d%d |%s%s%s", PC, data,
+				 (RDSP16 (DSP_CSR) & DSP_CSR_DSPINT) > 0,
+				 (RDSP16 (DSP_CSR) & DSP_CSR_ARINT) > 0,
+				 (RDSP16 (DSP_CSR) & DSP_CSR_AIDINT) > 0,
+				 (data & DSP_CSR_DSPINTMSK) > 0,
+				 (data & DSP_CSR_ARINTMSK) > 0,
+				 (data & DSP_CSR_AIDINTMSK) > 0,
+				 (data & DSP_CSR_DSPINT) > 0,
+				 (data & DSP_CSR_ARINT) > 0,
+				 (data & DSP_CSR_AIDINT) > 0,
+				 (data & DSP_CSR_DMAINTST) > 0,
+				 (data & DSP_CSR_PIINT) > 0,
+				 (data & DSP_CSR_DSPINIT) ? " init" : "",
+				 (data & DSP_CSR_RES) ? " reset" : "",
+				 (data & DSP_CSR_HALT) ? " halt" : "");
 
 	if (data & DSP_CSR_DSPINT)
 		RDSP16 (DSP_CSR) &= ~DSP_CSR_DSPINT;

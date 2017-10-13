@@ -2,8 +2,8 @@
 #define __GX_TEXTURE_H 1
 
 
-#define TEXCACHE_MAGIC				BSWAP32 (0xdeadbeef)
-#define XFB_MAGIC							BSWAP32 (0xbabe1ee5)
+#define TEXCACHE_MAGIC					BSWAP32 (0xdeadbeef)
+#define XFB_MAGIC(n)						(BSWAP32 (0xbab1eee5) + n)
 #define MAX_TEXCACHE_TAGS				0x1000
 
 
@@ -40,6 +40,7 @@ typedef struct
 	// for render targets
 	int xfb_mipmap;
 	int dont_use;
+	int informat;
 } TextureTag;
 
 
@@ -50,6 +51,12 @@ typedef struct
 
 	__u32 memory_used;
 } TextureCache;
+
+
+typedef struct
+{
+	int informat, format, type, csize;
+} RTTex;
 
 
 void gx_convert_texture_i4_rgba (__u8 *src, int width, int height, __u16 *tlut, int format, TexFormat *tf);
@@ -82,19 +89,21 @@ void texcache_tag_invalidate (TextureTag *tag);
 void texcache_invalidate_all (void);
 void texcache_remove_tag (TextureTag *tag);
 void texcache_remove_all (void);
+void texcache_rt_remove_all (void);
 void texcache_remove_unused (void);
 TextureTag *texcache_add_tag (__u32 address, __u32 tlut_address,
 		unsigned int tex, unsigned int type, int width, int height,
 		int format, int tlut_format, unsigned int gl_internal_format,
 		int mipmap, int min_lod, int max_lod,	__u32 even_lod);
-TextureTag *texcache_fetch (__u32 address, int width, int height);
+TextureTag *texcache_fetch (__u32 address, __u32 tlut_address, int width, int height);
 
 void gx_enable_texture (unsigned int index, int enable);
 void gx_load_texture (unsigned int index);
 void gx_dump_active_texture (int index, int lod);
-void gx_create_render_target (void);
 void gx_render_to_texture (__u32 address, unsigned int x, unsigned int y,
-													 unsigned int w, unsigned int h, int mipmap);
+													 unsigned int w, unsigned int h, int mipmap, int type);
+
+inline int gx_is_tex_p2 (int n);
 
 
 #endif // __GX_TEXTURE_H

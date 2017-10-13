@@ -5374,6 +5374,8 @@ int main (int argc, char **argv)
 		{"help", 0, 0, 'h'},
 		{"debug", 0, 0, 'd'},
 		{"fullscreen", 0, 0, 'f'},
+		{"ewidth", 1, 0, 'x'},
+		{"eheight", 1, 0, 'y'},
 		{"mount", 1, 0, 'm'},
 		{"color-mode", 1, 0, 'c'},
 		{"ignore-movies", 1, 0, 'i'},
@@ -5394,7 +5396,7 @@ int main (int argc, char **argv)
 
 
 	opterr = 0;
-	while (-1 != (c = getopt_long (argc, argv, "hdf01m:c:i:r:pls", long_options, &option_index)))
+	while (-1 != (c = getopt_long (argc, argv, "hdf01x:y:m:c:i:r:pls", long_options, &option_index)))
 	{
 		switch (c)
 		{
@@ -5402,6 +5404,8 @@ int main (int argc, char **argv)
 				printf ("%s: Open source gamecube emulator\n", GCUBE_DESCRIPTION);
 				printf ("Usage: gcube [OPTIONS] file\n");
 				printf ("  -f, --fullscreen                 run in fullscreen\n");
+				printf ("  -x, --ewidth                     emulated screen width\n");
+				printf ("  -y, --eheight                    emulated screen height\n");
 				printf ("  -m, --mount=directory            mount virtual dvd root directory\n");
 				printf ("  -i, --ignore-movies=MODE         tries to disable movie playback:\n");
 				printf ("                                    0 - disabled (movie playback is on)\n");
@@ -5445,6 +5449,14 @@ int main (int argc, char **argv)
 				fullscreen = TRUE;
 				break;
 			
+			case 'x':
+				sscanf (optarg, "%d", &ewidth);
+				break;
+
+			case 'y':
+				sscanf (optarg, "%d", &eheight);
+				break;
+
 			case 'r':
 				sscanf (optarg, "%d", &ref_delay);
 				break;
@@ -5498,7 +5510,7 @@ int main (int argc, char **argv)
 	config_load ("gcuberc");
 
 #ifdef OPEN_WINDOW_ON_START
-	video_init (640, 480);
+	video_init (VIDEO_WIDTH, VIDEO_HEIGHT);
 #endif
 
 	if (!map && (ignore_movies || hle_input || use_hle))

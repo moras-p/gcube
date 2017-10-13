@@ -293,8 +293,8 @@ extern __u64 ps1[32];
 
 #define SET_FIELD(X,n,Y)\
 	({\
-			__u32 _n = (n);\
-			(X = (X &~ (0x0f << ((7-(_n)) << 2))) | ((Y) << ((7-(_n)) << 2)));\
+			__u32 xn = (n);\
+			(X = (X &~ (0x0f << ((7-(xn)) << 2))) | ((Y) << ((7-(xn)) << 2)));\
 	})
 #define CLEAR_FIELD(X,n)	(X = (X &~ (0x0f << ((7-(n)) << 2))))
 #define GET_FIELD(X,n)		((X >> (32 - (((n) + 1) << 2))) & 0x0f)
@@ -302,16 +302,16 @@ extern __u64 ps1[32];
 // signed
 #define CALC_CR(n,X,Y)\
 	({\
-			__s32 _X = (X);\
-			__s32 _Y = (Y);\
-			SET_FIELD (CR, n, ((IS_XER_SO) ? CR_SO : 0) | ((_X < _Y) ? CR_LT : 0) | ((_X > _Y) ? CR_GT : 0) | ((_X == _Y) ? CR_EQ : 0));\
+			__s32 xX = (X);\
+			__s32 xY = (Y);\
+			SET_FIELD (CR, n, ((IS_XER_SO) ? CR_SO : 0) | ((xX < xY) ? CR_LT : 0) | ((xX > xY) ? CR_GT : 0) | ((xX == xY) ? CR_EQ : 0));\
 	})
 // unsigned
 #define CALC_CRL(n,X,Y)\
 	({\
-			__u32 _X = (X);\
-			__u32 _Y = (Y);\
-			SET_FIELD (CR, n, ((IS_XER_SO) ? CR_SO : 0) | ((_X < _Y) ? CR_LT : 0) | ((_X > _Y) ? CR_GT : 0) | ((_X == _Y) ? CR_EQ : 0));\
+			__u32 xX = (X);\
+			__u32 xY = (Y);\
+			SET_FIELD (CR, n, ((IS_XER_SO) ? CR_SO : 0) | ((xX < xY) ? CR_LT : 0) | ((xX > xY) ? CR_GT : 0) | ((xX == xY) ? CR_EQ : 0));\
 	})
 
 // rewrite in asm
@@ -324,14 +324,14 @@ extern __u64 ps1[32];
 #define IS_SNAN(X)				((((X) & 0x000fffffffffffffULL) != 0) && (((X) & 0x7ff8000000000000ULL) == 0x7ff0000000000000ULL))
 #define CALC_CRF(n,X,Y)\
 	({\
-			double _X = (X);\
-			double _Y = (Y);\
-			if (_X < _Y)\
+			double xX = (X);\
+			double xY = (Y);\
+			if (xX < xY)\
 			{\
 				SET_FIELD (CR, n, 8);\
 				FPSCR |= 8 << FPSCR_FPCC;\
 			}\
-			else if (_X > _Y)\
+			else if (xX > xY)\
 			{\
 				SET_FIELD (CR, n, 4);\
 				FPSCR |= 4 << FPSCR_FPCC;\
@@ -346,8 +346,8 @@ extern __u64 ps1[32];
 #define IS_NANS						IS_NAN
 #define CALC_CRFS(n,Xf,Xb,Yf,Yb)\
 	({\
-			double _X = (Xf);\
-			double _Y = (Yf);\
+			double xX = (Xf);\
+			double xY = (Yf);\
 			FPSCR &= ~(0x1f << FPSCR_FPCC);\
 			if (IS_NAN (Xb) || IS_NAN (Yb))\
 			{\
@@ -355,12 +355,12 @@ extern __u64 ps1[32];
 				FPSCR |= 1 << FPSCR_FPCC;\
 				FPSCR |= FPSCR_VXSNAN;\
 			}\
-			else if (_X < _Y)\
+			else if (xX < xY)\
 			{\
 				SET_FIELD (CR, n, 8);\
 				FPSCR |= 8 << FPSCR_FPCC;\
 			}\
-			else if (_X > _Y)\
+			else if (xX > xY)\
 			{\
 				SET_FIELD (CR, n, 4);\
 				FPSCR |= 4 << FPSCR_FPCC;\
@@ -415,11 +415,11 @@ extern __u64 ps1[32];
 
 #define GENMASK(X,Y)\
 	({\
-			__u32 _X = (X);\
-			__u32 _Y = (Y);\
-			((_X <= _Y) ? \
-			((0xffffffff >> (_X)) ^ (((_Y) < 31)? (0xffffffff >> ((_Y) + 1)) : 0)) :\
-			(~((0xffffffff >> (_X)) ^ (((_Y) < 31)? (0xffffffff >> ((_Y) + 1)) : 0)))) ;\
+			__u32 xX = (X);\
+			__u32 xY = (Y);\
+			((xX <= xY) ? \
+			((0xffffffff >> (xX)) ^ (((xY) < 31)? (0xffffffff >> ((xY) + 1)) : 0)) :\
+			(~((0xffffffff >> (xX)) ^ (((xY) < 31)? (0xffffffff >> ((xY) + 1)) : 0)))) ;\
 	})
 #define MASK(X,Y)			(mask[X][Y])
 

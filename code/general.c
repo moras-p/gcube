@@ -269,7 +269,7 @@ void create_dir_tree (char *parent)
 {
 	char *str = getenv ("HOME");
 	// first try HOME (linux)
-	// second try HOMEDRIVE + HOMEPATH (windows)s
+	// second try HOMEDRIVE + HOMEPATH (windows)
 	// otherwise try current working directory
 	if (str)
 	{
@@ -314,4 +314,116 @@ int path_writeable (char *path)
 	fclose (f);
 	remove (buff);
 	return TRUE;
+}
+
+
+void magic_num_reset (MagicNum *m)
+{
+	m->xmagic = 0;
+#if MAGICNUM_SAFE
+	m->rmagic[0] = 0;
+	m->n = m->nbits = 0;
+#endif
+}
+
+
+void magic_num_cpy (MagicNum *dest, MagicNum *src)
+{
+#if MAGICNUM_SAFE
+	int i;
+	
+	
+	for (i = 0; i < src->n; i++)
+		dest->rmagic[i] = src->rmagic[i];
+	
+	dest->n = src->n;
+	dest->nbits = src->nbits;
+#endif
+	dest->xmagic = src->xmagic;
+}
+
+
+void magic_num_acc (MagicNum *m, unsigned int value, unsigned int bits)
+{
+#if MAGICNUM_SAFE
+	if (m->nbits + bits >= 32)
+	{
+		int k = m->nbits + bits - 32;
+		
+		m->rmagic[m->n] <<= bits - k;
+		m->rmagic[m->n] |= value >> k;
+		m->n++;
+
+		if (m->n >= MAX_RMAGIC)
+			printf ("max rmagic exceeded!!\n");
+
+		m->rmagic[m->n] = value & (0xffffffff >> (32 - k));
+		m->nbits = k;
+	}
+	else
+	{
+		m->rmagic[m->n] <<= bits;
+		m->rmagic[m->n] |= value;
+		m->nbits += bits;
+	}
+#endif
+	m->xmagic = (m->xmagic << bits) ^ value ^ (m->xmagic >> 0) ^ (value << 8);
+	m->xmagic += (value + 1) * bits;
+}
+
+
+int magic_num_eq (MagicNum *a, MagicNum *b)
+{
+	if (a->xmagic != b->xmagic) 
+		return FALSE;
+
+#if MAGICNUM_SAFE
+	{	
+		int i;
+
+
+		if (a->n != b->n)
+		{
+			printf ("xmagic failed!\n");
+			return FALSE;
+		}
+		
+		for (i = 0; i < a->n; i++)
+			if (a->rmagic[i] != b->rmagic[i])
+			{
+				printf ("xmagic failed!\n");
+				return FALSE;
+			}
+	}
+#endif	
+	return TRUE;
+}
+
+
+__u32 magic_num_xmagic (MagicNum *m)
+{
+	return m->xmagic;
+}
+
+
+char *f2str (const char *filename)
+{
+	FILE *f = fopen (filename, "r");
+	int size;
+	char *str;
+	
+	
+	if (!f)
+		return NULL;
+	
+	fseek (f, 0, SEEK_END);
+	size = ftell (f);
+	rewind (f);
+	
+	str = malloc (size + 1);
+	fread (str, 1, size, f);
+	str[size] = '\0';
+	fclose (f);
+	
+	return str;
 }

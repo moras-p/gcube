@@ -35,6 +35,7 @@ CFLAGS+=-g -fgnu89-inline -Wall $(INCLUDES) $(QUIET) $(SDL_CFLAGS)
 OBJECTS=\
 	 timer_sdl.o\
 	 dsp_opcodes.o\
+	 cg.o\
 	 dsp_disassemble.o
 	 
 OBJECTS+=\

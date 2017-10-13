@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cg.h"
 #include "mem.h"
 #include "hw_si.h"
 #include "audio.h"
@@ -14,7 +15,10 @@
 // GL_TEXTURE_RECTANGLE_EXT / NV
 #define GL_TEXTURE_RECT 		0x84f5
 //#define GL_TEXTURE_RECT 	GL_TEXTURE_2D
-#define VID_BPP						24
+#define VID_BPP						32
+
+#define VIDEO_WIDTH				(ewidth ? ewidth : 640)
+#define VIDEO_HEIGHT			(eheight ? eheight : 480)
 
 extern int screen_width, screen_height;
 

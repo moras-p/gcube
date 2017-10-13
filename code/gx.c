@@ -22,13 +22,16 @@
  *         
  */
 
-#include "hw_gx.h"
 #include <SDL/SDL_opengl.h>
-
+#include "hw_gx.h"
 #include "gl_ext.h"
 
-float max_anisotropy = 1;
+//#define ASSUME_WIDTH 640
+//#define ASSUME_HEIGHT 448
 
+
+float max_anisotropy = 1;
+unsigned int ewidth = 0, eheight = 0;
 
 
 void gx_set_max_anisotropy (float a)
@@ -39,14 +42,20 @@ void gx_set_max_anisotropy (float a)
 
 int gx_get_real_height (void)
 {
-	// just trying to guess the number of lines
-	return (FLOAT_EQ (-XF_VIEWPORT_B * 2, 448) ? 448 : 480);
+	if (eheight)
+		return eheight;
+	else
+		// just trying to guess the number of lines
+		return (FLOAT_EQ (-XF_VIEWPORT_B * 2, 448) ? 448 : 480);
 }
 
 
 int gx_get_real_width (void)
 {
-	return (((XF_VIEWPORT_A * 2) < RVI16 (0x2070)) ? RVI16 (0x2070) : (XF_VIEWPORT_A * 2));
+	if (ewidth)
+		return ewidth;
+	else
+		return (((XF_VIEWPORT_A * 2) < RVI16 (0x2070)) ? RVI16 (0x2070) : (XF_VIEWPORT_A * 2));
 }
 
 
@@ -195,7 +204,7 @@ void gx_set_lpsize (void)
 {
 	DEBUG (EVENT_LOG_GX, "....  SIZE point %d line %d OFFSET point %d line %d", POINT_SIZE, LINE_SIZE, POINT_TEX_OFFSET, LINE_TEX_OFFSET);
 
-	glPointSize ((float) POINT_SIZE / 6);
+	glPointSize ((float) (POINT_SIZE + 0.001) * M_SQRT2 / 6);
 	glLineWidth ((float) LINE_SIZE / 6);
 }
 
@@ -314,7 +323,6 @@ void gx_set_cmode0 (void)
 		GL_SET,
 	};
 
-
 	DEBUG (EVENT_LOG_GX,"....  CMODE0 ENABLE B%d/D%d/L%d UPDATE C%d/A%d FACTOR S%d/D%d LOGICOP %d",
 				 CMODE_BLEND_ENABLED>0, CMODE_DITHER_ENABLED>0, CMODE_LOGICOP_ENABLED>0,
 				 CMODE_COLOR_ENABLED>0, CMODE_ALPHA_ENABLED>0,
@@ -331,13 +339,12 @@ void gx_set_cmode0 (void)
 	if (CMODE_BLEND_ENABLED)
 	{
 		glEnable (GL_BLEND);
+
 		if (gxswitches.blending_fix)
 			glBlendFunc (sfactor_fix[CMODE_SFACTOR], dfactor_fix[CMODE_DFACTOR]);
 		else
 			glBlendFunc (sfactor[CMODE_SFACTOR], dfactor[CMODE_DFACTOR]);
-		// this one needs GL_ARB_imaging
-		// lame windows need the extensions to be loaded manually
-		// comment this line to compile it
+
 #ifndef NO_GL_EXT
 		glBlendEquation (CMODE_SUBTRACT ? GL_FUNC_REVERSE_SUBTRACT : GL_FUNC_ADD);
 #endif
@@ -405,7 +412,6 @@ void gx_set_zmode (void)
 #define GX_AOP_XOR			2
 #define GX_AOP_XNOR			3
 
-// todo: use shaders for full emulation (both first and second operation)
 void gx_set_alphafunc (void)
 {
 	unsigned int alphafunc[] =
@@ -427,8 +433,11 @@ void gx_set_alphafunc (void)
 				 TEV_ALPHAFUNC_LOGIC,
 				 TEV_ALPHAFUNC_OP1, (float) TEV_ALPHAFUNC_A1 / 0xff);
 
-	if (gxswitches.wireframe)
+	if (gxswitches.wireframe || gxswitches.use_shaders)
+	{
+		cg_params_set_aref (TEV_ALPHAFUNC_A0, TEV_ALPHAFUNC_A1);
 		return;
+	}
 
 	switch (TEV_ALPHAFUNC_LOGIC)
 	{
@@ -453,21 +462,69 @@ void gx_set_alphafunc (void)
 }
 
 
-void gx_set_fog_param3 (void)
+void gx_set_fog (void)
 {
-/*
-	// calculate fog_startz and fog_endz
-	if (TEV_FOG_FSEL == GX_FOG_LINEAR)
-	{
-		glEnable (GL_FOG);
+	Single32 a;
+	float fog_a, fog_b, fog_c, start, end;
 
-		glFogi (GL_FOG_MODE, GL_LINEAR);
-		glFogf (GL_FOG_START, fog_startz);
-		glFogf (GL_FOG_END, fog_endz);
-	}
-	else
+
+	if (!gxswitches.fog_enabled || XF_PROJECTION_ORTHOGRAPHIC)
+	{
 		glDisable (GL_FOG);
-*/
+		return;
+	}
+
+	a.bin = BP_TEV_FOG_PARAM_0 << 12;
+	fog_a = a.fp;
+
+	fog_b = (BP_TEV_FOG_PARAM_1 & 0xffffff) / (1 << (24 - (TEV_FOG_B_SHF)));
+
+	a.bin = BP_TEV_FOG_PARAM_3 << 12;
+	fog_c = a.fp;
+
+	// A * (1<<B_SHF) = farz * nearz / ((farz - nearz) * (endz - startz))
+	// B = farz / (farz - nearz)
+	// C = startz / (endz - startz)
+
+	// if farz and nearz match projection matrix parameters (check B) then
+	//   A' = A * (1 << B_SHF)
+	//   A0 = farz * nearz / (farz - nearz) = -XF_PROJECTION_F
+	//   startz = A0 * C
+	//   endz = A0 (C + 1/A')
+	// this should be equal to B (rounded)
+
+	fog_a *= 1 << TEV_FOG_B_SHF;	
+	start = fog_c * fog_a / -XF_PROJECTION_F * 1000000;
+	end = -XF_PROJECTION_F / fog_a + start;
+
+//	glFogi (GL_FOG_COORDINATE_SOURCE_EXT, GL_FRAGMENT_DEPTH_EXT);
+
+	switch (TEV_FOG_FSEL)
+	{
+		case GX_FOG_LINEAR:
+			glFogf (GL_FOG_START, start);
+			glFogf (GL_FOG_END, end);
+			glFogi (GL_FOG_MODE, GL_LINEAR);
+			glEnable (GL_FOG);
+			break;
+
+		case GX_FOG_EXP:
+		case GX_FOG_BXP:
+			glFogf (GL_FOG_DENSITY, 1 / (end - start));
+			glFogi (GL_FOG_MODE, GL_EXP);
+			glEnable (GL_FOG);
+			break;
+
+		case GX_FOG_EXP2:
+		case GX_FOG_BXP2:
+			glFogf (GL_FOG_DENSITY, 1 / (end - start));
+			glFogi (GL_FOG_MODE, GL_EXP2);
+			glEnable (GL_FOG);
+			break;
+
+		default:
+			glDisable (GL_FOG);
+	}
 }
 
 
@@ -481,7 +538,7 @@ void gx_set_fog_color (void)
 		1,
 	};
 	
-	
+
 	glFogfv (GL_FOG_COLOR, color);
 }
 
@@ -532,6 +589,9 @@ void gx_set_scissors (void)
 	w += 1;
 	h += 1;
 
+	xscale = (float) screen_width / gx_get_real_width ();
+	yscale = (float) screen_height / gx_get_real_height ();
+
 	DEBUG (EVENT_LOG_GX, "....  SCISSORS %d %d %d %d %d %d", x, y, w, h, xofs, yofs);
 
 	glEnable (GL_SCISSOR_TEST);
@@ -540,9 +600,6 @@ void gx_set_scissors (void)
 	x -= xofs;
 	y -= yofs;
 #endif
-
-	xscale = (float) screen_width / gx_get_real_width ();
-	yscale = (float) screen_height / gx_get_real_height ();
 
 	h *= yscale;
 	y *= yscale;
@@ -553,7 +610,8 @@ void gx_set_scissors (void)
 	glViewport (x, screen_height - (y + h), w, h);
 #endif
 
-	glScissor (x, screen_height - (y + h), w, h);
+	if (!((w < 0) || (h < 0)))
+		glScissor (x, screen_height - (y + h), w, h);
 }
 
 
@@ -575,7 +633,6 @@ void gx_set_viewport (void)
 
 	xscale = (float) screen_width / gx_get_real_width ();
 	yscale = (float) screen_height / gx_get_real_height ();
-
 	// double scale -> egg mania fix
 	// yscale *= 2;
 
@@ -594,6 +651,65 @@ void gx_set_gamma (void)
 
 
 	video_set_gamma (rgb_gamma[COPY_EXECUTE_GAMMA]);
+}
+
+
+void gx_set_tev_konst_ra (int index)
+{
+	float c[2];
+
+
+	c[0] = (float) EXTS (11, TEV_REG_R (index)) / 255;
+	c[1] = (float) EXTS (11, TEV_REG_A (index)) / 255;
+
+	if (TEV_REG_RA_TYPE (index))
+		cg_params_set_konst_ra (index, c);
+	else
+		cg_params_set_const_ra (index, c);
+}
+
+
+void gx_set_tev_konst_bg (int index)
+{
+	float c[2];
+
+
+	c[0] = (float) EXTS (11, TEV_REG_B (index)) / 255;
+	c[1] = (float) EXTS (11, TEV_REG_G (index)) / 255;
+
+	if (TEV_REG_BG_TYPE (index))
+		cg_params_set_konst_bg (index, c);
+	else
+		cg_params_set_const_bg (index, c);
+}
+
+
+void gx_set_tev_indm_ab (int index)
+{
+	cg_params_set_indm_ab (index, FLOAT_S11 (IND_MA (index)),
+																FLOAT_S11 (IND_MB (index)));
+}
+
+
+
+void gx_set_tev_indm_cd (int index)
+{
+	cg_params_set_indm_cd (index, FLOAT_S11 (IND_MC (index)),
+																FLOAT_S11 (IND_MD (index)));
+}
+
+
+
+void gx_set_tev_indm_ef (int index)
+{
+	cg_params_set_indm_ef (index, FLOAT_S11 (IND_ME (index)),
+																FLOAT_S11 (IND_MF (index)));
+}
+
+
+void gx_set_tev_indscale (int index)
+{
+	cg_params_set_indscale (index, IND_MSF (index));
 }
 
 
@@ -626,16 +742,22 @@ void gx_copy_efb (void)
 
 		xscale = (float) screen_width / gx_get_real_width ();
 		yscale = (float) screen_height / gx_get_real_height ();
-
+/*
 		w = xscale * (EFB_SRC_WIDTH + 1);
 		h = yscale * (EFB_SRC_HEIGHT + 1);
 		x = xscale * EFB_SRC_LEFT;
 		y = yscale * EFB_SRC_TOP;
+*/
+		w = EFB_SRC_WIDTH + 1;
+		h = EFB_SRC_HEIGHT + 1;
+		x = EFB_SRC_LEFT;
+		y = EFB_SRC_TOP;
 
 		// efb to texture
 		DEBUG (EVENT_LOG_GX, "....  copy color buffer to texture");
 
-		gx_render_to_texture (XFB_ADDRESS, x, y, w, h, COPY_EXECUTE_MIPMAP);
+		gx_render_to_texture (XFB_ADDRESS, x, y, w, h, COPY_EXECUTE_MIPMAP,
+													(PIXEL_FORMAT == PF_Z24) ? 1 : 0);
 
 		if (COPY_EXECUTE_CLEAR_EFB)
 		{

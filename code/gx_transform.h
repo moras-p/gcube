@@ -15,6 +15,7 @@ inline __u32 color_unpack_ia4 (__u32 X);
 inline __u32 color_unpack_ia8 (__u32 X);
 
 unsigned int gx_draw (__u32 mem, int prim, int n, int vat);
+inline unsigned int gx_list_size (unsigned int n, int vat);
 
 
 #endif // __GX_TRANSFORM_H

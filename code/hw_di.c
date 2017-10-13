@@ -570,6 +570,8 @@ void dir_destroy (Dir *dir)
 
 		p = n;
 	}
+
+	free (dir);
 }
 
 
@@ -741,16 +743,17 @@ int vdvd_open (char *path)
 		*(__u32 *) &mdvd.header[DVD_FST_SIZE] = BSWAP32 (fst_size);
 		*(__u32 *) &mdvd.header[DVD_FST_MAX_SIZE] = BSWAP32 (fst_size);
 		// where to load fst
-		MEM_WWORD (MEM_HEAP_TOP, round_up (MEM_RWORD (MEM_HEAP_TOP) - fst_size, 32));
-		MEM_WWORD (MEM_FST, MEM_RWORD (MEM_HEAP_TOP));
-		MEM_WWORD (MEM_FST_SIZE, fst_size);
-		*(__u32 *) &mdvd.header[0x430] = BSWAP32 (MEM_RWORD (MEM_FST));
+		MEMWR32 (MEM_HEAP_TOP, round_up (MEMR32 (MEM_HEAP_TOP) - fst_size, 32));
+		MEMWR32 (MEM_FST, MEMR32 (MEM_HEAP_TOP));
+		MEMWR32 (MEM_FST_SIZE, fst_size);
+		// no bswap here
+		*(__u32 *) &mdvd.header[0x430] = MEM32 (MEM_FST);
 		
 		// info
 		strcpy (&mdvd.header[0], "VDVD");
 		*(__u32 *) &mdvd.header[4] = BSWAP32 (0x30300000);
 		strcpy (&mdvd.header[0x20], "Virtual DVD");
-		
+
 		
 		mdvd.vdvd_inserted = TRUE;
 		di_close_cover ();
@@ -758,8 +761,8 @@ int vdvd_open (char *path)
 		DEBUG (EVENT_LOG_DI, "..di: virtual dvd contains %d files",
 						BSWAP32 (*(__u32 *) &mdvd.fst[8]));
 
-		MEM_WWORD (MEM_BOOT_MAGIC, MEM_BOOT_MAGIC_JTAG);
-		memcpy (MEM_ADDRESS (MEM_RWORD (MEM_FST)), mdvd.fst, fst_size);
+		MEMWR32 (MEM_BOOT_MAGIC, MEM_BOOT_MAGIC_JTAG);
+		memcpy (MEM_ADDRESS (MEMR32 (MEM_FST)), mdvd.fst, fst_size);
 
 		return TRUE;
 	}
@@ -831,7 +834,7 @@ void mdvd_close (void)
 		dir_destroy (mdvd.root);
 		mdvd.root = NULL;
 	}
-	
+
 	di_open_cover ();
 }
 
@@ -918,7 +921,10 @@ unsigned int mdvd_read_fixed (void *dest, unsigned int size)
 
 	if (mdvd.pos)
 	{
-		p = dir_find_item_by_offset_aligned (mdvd.root, mdvd.pos, NULL);
+		if (size & 31)
+			DEBUG (EVENT_STOP, "..di: length %d is not a multiple of 32", size);
+
+		p = dir_find_item_by_offset_aligned (mdvd.root, mdvd.pos + 3, NULL);
 
 		if (p)
 		{
@@ -961,11 +967,11 @@ Dir *mdvd_read_fst (int modify_mem)
 
 	if (modify_mem)
 	{
-		MEM_WWORD (MEM_HEAP_TOP, MEM_RWORD (MEM_HEAP_TOP) - max_size);
-		MEM_WWORD (MEM_FST, MEM_RWORD (MEM_HEAP_TOP));
-		MEM_WWORD (MEM_FST_SIZE, max_size);
+		MEMWR32 (MEM_HEAP_TOP, MEMR32 (MEM_HEAP_TOP) - max_size);
+		MEMWR32 (MEM_FST, MEMR32 (MEM_HEAP_TOP));
+		MEMWR32 (MEM_FST_SIZE, max_size);
 
-		buff = (void *) MEM_ADDRESS (MEM_RWORD (MEM_FST));
+		buff = (void *) MEM_ADDRESS (MEMR32 (MEM_FST));
 	}
 	else
 		buff = malloc (size);
@@ -1087,10 +1093,10 @@ void boot_apploader (void)
 	// BS2Report
 	bs2report = BSWAP32 (hle_opcode ("BS2Report"));
 	if (bs2report)
-		MEM32 (0x81300000) = BSWAP32 (hle_opcode ("BS2Report"));
+		MEMWR32 (0x81300000, hle_opcode ("BS2Report"));
 	else
-		MEM32 (0x81300000) = BSWAP32 (0x4e800020);		// blr
-	
+		MEMWR32 (0x81300000, 0x4e800020);		// blr
+
 	GPR[3] = 0x81300004;		// prolog
 	GPR[4] = 0x81300008;		// main
 	GPR[5] = 0x8130000c;		// epilog

@@ -3,14 +3,14 @@
 #include "general.h"
 #include <SDL/SDL.h>
 
-#ifdef LOAD_GLEXT
+#ifdef WINDOWS
 GLAPI void APIENTRY gl_ext_null (void) {}
 
-PFNGLACTIVETEXTUREARBPROC glActiveTextureARB = (PFNGLACTIVETEXTUREARBPROC) gl_ext_null;
-PFNGLMULTITEXCOORD4FARBPROC glMultiTexCoord4fARB = (PFNGLMULTITEXCOORD4FARBPROC) gl_ext_null;
-PFNGLVERTEXATTRIB4FVARBPROC glVertexAttrib4fvARB = (PFNGLVERTEXATTRIB4FVARBPROC) gl_ext_null;
-PFNGLBLENDEQUATIONPROC glBlendEquation = (PFNGLBLENDEQUATIONPROC) gl_ext_null;
-PFNGLWINDOWPOS2IPROC glWindowPos2i = (PFNGLWINDOWPOS2IPROC) gl_ext_null;
+PFNGLACTIVETEXTUREARBPROC glActiveTextureARB = (void *) gl_ext_null;
+PFNGLMULTITEXCOORD4FARBPROC glMultiTexCoord4fARB = (void *) gl_ext_null;
+PFNGLVERTEXATTRIB4FVARBPROC glVertexAttrib4fvARB = (void *) gl_ext_null;
+PFNGLBLENDEQUATIONPROC glBlendEquation = (void *) gl_ext_null;
+PFNGLWINDOWPOS2IPROC glWindowPos2i = (void *) gl_ext_null;
 
 int gl_load_ext (void)
 {
@@ -21,13 +21,6 @@ int gl_load_ext (void)
     glWindowPos2i = (PFNGLWINDOWPOS2IPROC) SDL_GL_GetProcAddress ("glWindowPos2i");
 
     return TRUE;
-}
-
-#else
-
-int gl_load_ext (void)
-{
-	return TRUE;
 }
 
 #endif

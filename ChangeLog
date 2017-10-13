@@ -1,3 +1,19 @@
+
+  0.6a   - mmu emulation
+
+  0.6    - various fixes
+
+  0.5c  - cleanups
+		- applied patches by Roland Illig fixing compile errors on NetBSD
+
+  0.5b  - many improvements to the new rendering engine, some for the old one
+			new engine requires shader support now (arbvp1 and arbfp1) and
+			nvidia-cg-toolkit to compile
+	      - emulated screen resolution can be given in the command line now
+
+  0.5a  - when video mode is set, vi registers are set to predefined values
+			depending on system (ntsc / pal)
+
   0.5   - compilation under windows should now be much easier. use dev-cpp
 			and the supplied project files.
 		- various compatibility improvements

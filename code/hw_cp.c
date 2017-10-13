@@ -70,7 +70,7 @@ void cp_w16_direct (__u32 addr, __u16 data)
 
 void cp_w8_wpar_cpu (__u32 addr, __u8 data)
 {
-	DEBUG (EVENT_LOG_CP, "..cp: (%.8x) [%.8x] = %2.2x", PC, PI_FIFO_WPOINTER | 0x80000000, data);
+	DEBUG (EVENT_LOG_CP, "..cp: cpu (%.8x) [%.8x] = %2.2x", PC, PI_FIFO_WPOINTER | 0x80000000, data);
 
 	MEMW (PI_FIFO_WPOINTER, data);
 	PI_FIFO_WPOINTER++;
@@ -79,7 +79,7 @@ void cp_w8_wpar_cpu (__u32 addr, __u8 data)
 
 void cp_w16_wpar_cpu (__u32 addr, __u16 data)
 {
-	DEBUG (EVENT_LOG_CP, "..cp: (%.8x) [%.8x] = %4.4x", PC, PI_FIFO_WPOINTER | 0x80000000, data);
+	DEBUG (EVENT_LOG_CP, "..cp: cpu (%.8x) [%.8x] = %4.4x", PC, PI_FIFO_WPOINTER | 0x80000000, data);
 
 	MEMWR16 (PI_FIFO_WPOINTER, data);
 	PI_FIFO_WPOINTER += 2;
@@ -88,7 +88,7 @@ void cp_w16_wpar_cpu (__u32 addr, __u16 data)
 
 void cp_w32_wpar_cpu (__u32 addr, __u32 data)
 {
-	DEBUG (EVENT_LOG_CP, "..cp: (%.8x) [%.8x] = %8.8x", PC, PI_FIFO_WPOINTER | 0x80000000, data);
+	DEBUG (EVENT_LOG_CP, "..cp: cpu (%.8x) [%.8x] = %8.8x", PC, PI_FIFO_WPOINTER | 0x80000000, data);
 
 	MEMWR32 (PI_FIFO_WPOINTER, data);
 	PI_FIFO_WPOINTER += 4;
@@ -146,7 +146,7 @@ void cp_w8_wpar_gp (__u32 addr, __u8 data)
 	DEBUG (EVENT_LOG_CP, "..cp: (%.8x) [%.8x] = %2.2x", PC, CP_FIFO_WPOINTER | 0x80000000, data);
 	MEMW (CP_FIFO_WPOINTER, data);
 	CP_FIFO_WPOINTER++;
-	
+
 	cp_check_marks ();
 }
 
@@ -230,23 +230,39 @@ void cp_attach_fifo_to_gp (void)
 
 void cp_w16_cr (__u32 addr, __u16 data)
 {
-	DEBUG (EVENT_LOG_CP, "..cp: CR %.4x", data);
+	DEBUG (EVENT_LOG_CP, "..cp: write CR BPEN %d LINK %d UFMSK %d OFMSK %d BPCLR %d RDEN %d (SR BPINT %d)",
+				 (data & CP_CR_BPINTMSK)>0, (data & CP_CR_GPLINK)>0, (data & CP_CR_UFINTMSK)>0,
+				 (data & CP_CR_OFINTMSK)>0, (data & CP_CR_CLEAR_BP)>0, (data & CP_CR_RDEN)>0,
+				 (CPSR & CP_SR_BPINT)>0);
 
 	if ((data & CP_CR_GPLINK) && !(RCP16 (addr) & CP_CR_GPLINK))
+	// immediate mode
 		cp_attach_fifo_to_gp ();
 	else if (!(data & CP_CR_GPLINK) && (RCP16 (addr) & CP_CR_GPLINK))
+	// multi-buffer mode
 		cp_attach_fifo_to_cpu ();
 
 	RCP16 (addr) = data &~ CP_CR_CLEAR_BP;
 
 	if (data & CP_CR_CLEAR_BP)
 		RCP16 (CP_SR) &= ~CP_SR_BPINT;
+
+	if ((CPCR & CP_CR_RDEN) && CP_FIFO_RW_DIST)
+	{
+		DEBUG (EVENT_LOG_CP, "..cp: FIFO gp read enabled, parsing %.8x bytes from %.8x",
+					 CP_FIFO_RW_DIST, CP_FIFO_RPOINTER);
+
+		gx_parse_list (CP_FIFO_BASE, CP_FIFO_RW_DIST);
+		CP_FIFO_RW_DIST = 0;
+	}
 }
 
 
 void cp_w16_sr (__u32 addr, __u16 data)
 {
-	DEBUG (EVENT_LOG_CP, "..cp: SR %.4x", data);
+	DEBUG (EVENT_LOG_CP, "..cp: write SR BPINT %d GPCMD %d GPREAD %d UF %d OF %d",
+					(data & CP_SR_BPINT)>0, (data & CP_SR_IDLE)>0, (data & CP_SR_READY)>0,
+					(data & CP_SR_UFINT)>0, (data & CP_SR_OFINT)>0);
 
 	CPSR = CP_SR_READY | CP_SR_IDLE;
 	if (data & CP_SR_BPINT)
@@ -260,10 +276,10 @@ void cp_w16_clear (__u32 addr, __u16 data)
 					(data & CP_CLEAR_UF)>0, data & CP_CLEAR_OF);
 
 	if (data & CP_CLEAR_UF)
-		RCP16 (CP_SR) &= ~CP_SR_UFINT;
+		CPSR &= ~CP_SR_UFINT;
 
 	if (data & CP_CLEAR_OF)
-		RCP16 (CP_SR) &= ~CP_SR_OFINT;
+		CPSR &= ~CP_SR_OFINT;
 }
 
 
@@ -274,6 +290,13 @@ __u16 cp_r16_rwdist (__u32 addr)
 	CP_FIFO_RW_DIST = CP_FIFO_WPOINTER - CP_FIFO_RPOINTER;
 
 	return RCP16 (addr);
+}
+
+
+void cp_w16_wptr_hi (__u32 addr, __u16 data)
+{
+	RCP16 (addr) = data;
+	DEBUG (EVENT_LOG_CP, "..cp: set WPOINTER %.8x", CP_FIFO_WPOINTER);
 }
 
 
@@ -307,7 +330,7 @@ void cp_init (void)
 	mem_hwr_hook (16, CP_CR, cp_r16_direct);
 	mem_hww_hook (16, CP_CR, cp_w16_cr);
 
-	RCP16 (CP_SR) = CP_SR_READY | CP_SR_IDLE;
+	CPSR = CP_SR_READY | CP_SR_IDLE;
 	mem_hwr_hook (16, CP_SR, cp_r16_direct);
 	mem_hww_hook (16, CP_SR, cp_w16_sr);
 
@@ -353,8 +376,10 @@ void cp_init (void)
 	mem_hww_hook (16, CP_FIFO_LWMARK_HI, cp_w16_direct);
 	mem_hww_hook (16, CP_FIFO_RW_DIST_LO, cp_w16_direct);
 	mem_hww_hook (16, CP_FIFO_RW_DIST_HI, cp_w16_direct);
+
 	mem_hww_hook (16, CP_FIFO_WPOINTER_LO, cp_w16_direct);
-	mem_hww_hook (16, CP_FIFO_WPOINTER_HI, cp_w16_direct);
+	mem_hww_hook (16, CP_FIFO_WPOINTER_HI, cp_w16_wptr_hi);
+
 	mem_hww_hook (16, CP_FIFO_RPOINTER_LO, cp_w16_direct);
 	mem_hww_hook (16, CP_FIFO_RPOINTER_HI, cp_w16_direct);
 	mem_hww_hook (16, CP_FIFO_BP_LO, cp_w16_direct);

@@ -22,8 +22,10 @@
  *         
  */
 
-#include "hw_gx.h"
 #include <SDL/SDL_opengl.h>
+
+#include "hw_gx.h"
+#include "gl_ext.h"
 
 
 // pushed matrix indices
@@ -31,6 +33,9 @@ int pn_matrix_index;
 int tex_matrix_index[8];
 // dequantization factor
 float vdq, ndq, tdq[8];
+
+// using PSIZE attribute
+#define COLOR1_ATTR_NUM				6
 
 
 
@@ -52,15 +57,15 @@ inline __u32 color_unpack_rgb565 (__u32 X)
 
 inline __u32 color_unpack_rgba4 (__u32 X)
 {
-	__u32 _X = X;
+	__u32 xX = X;
 
 
 #ifdef LIL_ENDIAN
-	_X = ((X & 0x0f00) <<  0) | ((X & 0x00f0) << 12) | ((X & 0x000f) << 24) | ((X & 0xf000) >> 12);
+	xX = ((X & 0x0f00) <<  0) | ((X & 0x00f0) << 12) | ((X & 0x000f) << 24) | ((X & 0xf000) >> 12);
 #else
-	_X = ((X & 0x0f00) <<  8) | ((X & 0x00f0) <<  4) | ((X & 0x000f) <<  0) | ((X & 0xf000) << 12);
+	xX = ((X & 0x0f00) <<  8) | ((X & 0x00f0) <<  4) | ((X & 0x000f) <<  0) | ((X & 0xf000) << 12);
 #endif
-	return (_X | (_X << 4));
+	return (xX | (xX << 4));
 }
 
 
@@ -169,7 +174,7 @@ inline __u32 color_unpack_ia8 (__u32 X)
 // send position / normal matrix index
 unsigned int gx_send_pmidx (__u32 mem)
 {
-	pn_matrix_index = MEM (mem);
+	pn_matrix_index = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -178,7 +183,7 @@ unsigned int gx_send_pmidx (__u32 mem)
 // send texture matrix index
 unsigned int gx_send_t0midx (__u32 mem)
 {
-	tex_matrix_index[0] = MEM (mem);
+	tex_matrix_index[0] = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -186,7 +191,7 @@ unsigned int gx_send_t0midx (__u32 mem)
 
 unsigned int gx_send_t1midx (__u32 mem)
 {
-	tex_matrix_index[1] = MEM (mem);
+	tex_matrix_index[1] = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -194,7 +199,7 @@ unsigned int gx_send_t1midx (__u32 mem)
 
 unsigned int gx_send_t2midx (__u32 mem)
 {
-	tex_matrix_index[2] = MEM (mem);
+	tex_matrix_index[2] = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -202,7 +207,7 @@ unsigned int gx_send_t2midx (__u32 mem)
 
 unsigned int gx_send_t3midx (__u32 mem)
 {
-	tex_matrix_index[3] = MEM (mem);
+	tex_matrix_index[3] = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -210,7 +215,7 @@ unsigned int gx_send_t3midx (__u32 mem)
 
 unsigned int gx_send_t4midx (__u32 mem)
 {
-	tex_matrix_index[4] = MEM (mem);
+	tex_matrix_index[4] = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -218,7 +223,7 @@ unsigned int gx_send_t4midx (__u32 mem)
 
 unsigned int gx_send_t5midx (__u32 mem)
 {
-	tex_matrix_index[5] = MEM (mem);
+	tex_matrix_index[5] = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -226,7 +231,7 @@ unsigned int gx_send_t5midx (__u32 mem)
 
 unsigned int gx_send_t6midx (__u32 mem)
 {
-	tex_matrix_index[6] = MEM (mem);
+	tex_matrix_index[6] = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -234,7 +239,7 @@ unsigned int gx_send_t6midx (__u32 mem)
 
 unsigned int gx_send_t7midx (__u32 mem)
 {
-	tex_matrix_index[7] = MEM (mem);
+	tex_matrix_index[7] = FIFO_U8 (mem);
 	
 	return 1;
 }
@@ -295,9 +300,9 @@ unsigned int gx_send_ps8_xyz (__u32 mem)
 
 unsigned int gx_send_pu16_xy (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", MEMR16 (mem), MEMR16 (mem + 2));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", FIFO_U16 (mem), FIFO_U16 (mem + 2));
 
-	glVertex2i (MEMR16 (mem), MEMR16 (mem + 2));
+	glVertex2i (FIFO_U16 (mem), FIFO_U16 (mem + 2));
 
 	return 4;
 }
@@ -305,9 +310,9 @@ unsigned int gx_send_pu16_xy (__u32 mem)
 
 unsigned int gx_send_pu16_xyz (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", MEMR16 (mem), MEMR16 (mem + 2), MEMR16 (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", FIFO_U16 (mem), FIFO_U16 (mem + 2), FIFO_U16 (mem + 4));
 
-	glVertex3i (MEMR16 (mem), MEMR16 (mem + 2), MEMR16 (mem + 4));
+	glVertex3i (FIFO_U16 (mem), FIFO_U16 (mem + 2), FIFO_U16 (mem + 4));
 
 	return 6;
 }
@@ -315,9 +320,9 @@ unsigned int gx_send_pu16_xyz (__u32 mem)
 
 unsigned int gx_send_ps16_xy (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", MEMSR16 (mem), MEMSR16 (mem + 2));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", FIFO_S16 (mem), FIFO_S16 (mem + 2));
 
-	glVertex2s (MEMSR16 (mem), MEMSR16 (mem + 2));
+	glVertex2s (FIFO_S16 (mem), FIFO_S16 (mem + 2));
 
 	return 4;
 }
@@ -325,9 +330,9 @@ unsigned int gx_send_ps16_xy (__u32 mem)
 
 unsigned int gx_send_ps16_xyz (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", MEMSR16 (mem), MEMSR16 (mem + 2), MEMSR16 (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", FIFO_S16 (mem), FIFO_S16 (mem + 2), FIFO_S16 (mem + 4));
 
-	glVertex3s (MEMSR16 (mem), MEMSR16 (mem + 2), MEMSR16 (mem + 4));
+	glVertex3s (FIFO_S16 (mem), FIFO_S16 (mem + 2), FIFO_S16 (mem + 4));
 
 	return 6;
 }
@@ -335,9 +340,9 @@ unsigned int gx_send_ps16_xyz (__u32 mem)
 
 unsigned int gx_send_pf_xy (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f)", MEMRF (mem), MEMRF (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f)", FIFO_F (mem), FIFO_F (mem + 4));
 
-	glVertex2f (MEMRF (mem), MEMRF (mem + 4));
+	glVertex2f (FIFO_F (mem), FIFO_F (mem + 4));
 
 	return 8;
 }
@@ -345,9 +350,9 @@ unsigned int gx_send_pf_xy (__u32 mem)
 
 unsigned int gx_send_pf_xyz (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f, %.2f)", MEMRF (mem), MEMRF (mem + 4), MEMRF (mem + 8));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f, %.2f)", FIFO_F (mem), FIFO_F (mem + 4), FIFO_F (mem + 8));
 
-	glVertex3f (MEMRF (mem), MEMRF (mem + 4), MEMRF (mem + 8));
+	glVertex3f (FIFO_F (mem), FIFO_F (mem + 4), FIFO_F (mem + 8));
 
 	return 12;
 }
@@ -356,7 +361,7 @@ unsigned int gx_send_pf_xyz (__u32 mem)
 // 8 bit indexed position
 unsigned int gx_send_pi8u8_xy (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", p[0], p[1]);
@@ -369,7 +374,7 @@ unsigned int gx_send_pi8u8_xy (__u32 mem)
 
 unsigned int gx_send_pi8u8_xyz (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", p[0], p[1], p[2]);
@@ -382,7 +387,7 @@ unsigned int gx_send_pi8u8_xyz (__u32 mem)
 
 unsigned int gx_send_pi8s8_xy (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", p[0], p[1]);
@@ -395,7 +400,7 @@ unsigned int gx_send_pi8s8_xy (__u32 mem)
 
 unsigned int gx_send_pi8s8_xyz (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", p[0], p[1], p[2]);
@@ -408,7 +413,7 @@ unsigned int gx_send_pi8s8_xyz (__u32 mem)
 
 unsigned int gx_send_pi8u16_xy (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]));
@@ -421,7 +426,7 @@ unsigned int gx_send_pi8u16_xy (__u32 mem)
 
 unsigned int gx_send_pi8u16_xyz (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]), BSWAP16 (p[2]));
@@ -434,7 +439,7 @@ unsigned int gx_send_pi8u16_xyz (__u32 mem)
 
 unsigned int gx_send_pi8s16_xy (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]));
@@ -447,7 +452,7 @@ unsigned int gx_send_pi8s16_xy (__u32 mem)
 
 unsigned int gx_send_pi8s16_xyz (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]), BSWAPS16 (p[2]));
@@ -460,7 +465,7 @@ unsigned int gx_send_pi8s16_xyz (__u32 mem)
 
 unsigned int gx_send_pi8f_xy (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]));
@@ -473,7 +478,7 @@ unsigned int gx_send_pi8f_xy (__u32 mem)
 
 unsigned int gx_send_pi8f_xyz (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]));
@@ -487,7 +492,7 @@ unsigned int gx_send_pi8f_xyz (__u32 mem)
 // 16 bit indexed position
 unsigned int gx_send_pi16u8_xy (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", p[0], p[1]);
@@ -500,7 +505,7 @@ unsigned int gx_send_pi16u8_xy (__u32 mem)
 
 unsigned int gx_send_pi16u8_xyz (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", p[0], p[1], p[2]);
@@ -513,7 +518,7 @@ unsigned int gx_send_pi16u8_xyz (__u32 mem)
 
 unsigned int gx_send_pi16s8_xy (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", p[0], p[1]);
@@ -526,7 +531,7 @@ unsigned int gx_send_pi16s8_xy (__u32 mem)
 
 unsigned int gx_send_pi16s8_xyz (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", p[0], p[1], p[2]);
@@ -539,7 +544,7 @@ unsigned int gx_send_pi16s8_xyz (__u32 mem)
 
 unsigned int gx_send_pi16u16_xy (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]));
@@ -552,7 +557,7 @@ unsigned int gx_send_pi16u16_xy (__u32 mem)
 
 unsigned int gx_send_pi16u16_xyz (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]), BSWAP16 (p[2]));
@@ -565,7 +570,7 @@ unsigned int gx_send_pi16u16_xyz (__u32 mem)
 
 unsigned int gx_send_pi16s16_xy (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]));
@@ -578,7 +583,7 @@ unsigned int gx_send_pi16s16_xy (__u32 mem)
 
 unsigned int gx_send_pi16s16_xyz (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]), BSWAPS16 (p[2]));
@@ -591,7 +596,7 @@ unsigned int gx_send_pi16s16_xyz (__u32 mem)
 
 unsigned int gx_send_pi16f_xy (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]));
@@ -604,7 +609,7 @@ unsigned int gx_send_pi16f_xy (__u32 mem)
 
 unsigned int gx_send_pi16f_xyz (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]));
@@ -702,7 +707,7 @@ unsigned int gx_send_pu8_xy_midx (__u32 mem)
 {
 	float d[3], v[2] =
 	{
-		vdq * MEM (mem), vdq * MEM (mem + 1),
+		vdq * FIFO_U8 (mem), vdq * FIFO_U8 (mem + 1),
 	};
 
 
@@ -718,7 +723,7 @@ unsigned int gx_send_pu8_xyz_midx (__u32 mem)
 {
 	float d[3], v[3] =
 	{
-		vdq * MEM (mem), vdq * MEM (mem + 1), vdq * MEM (mem + 2),
+		vdq * FIFO_U8 (mem), vdq * FIFO_U8 (mem + 1), vdq * FIFO_U8 (mem + 2),
 	};
 
 
@@ -734,7 +739,7 @@ unsigned int gx_send_ps8_xy_midx (__u32 mem)
 {
 	float d[3], v[2] =
 	{
-		vdq * MEMS (mem), vdq * MEMS (mem + 1),
+		vdq * FIFO_S8 (mem), vdq * FIFO_S8 (mem + 1),
 	};
 
 
@@ -750,7 +755,7 @@ unsigned int gx_send_ps8_xyz_midx (__u32 mem)
 {
 	float d[3], v[3] =
 	{
-		vdq * MEMS (mem), vdq * MEMS (mem + 1), vdq * MEMS (mem + 2),
+		vdq * FIFO_S8 (mem), vdq * FIFO_S8 (mem + 1), vdq * FIFO_S8 (mem + 2),
 	};
 
 
@@ -766,7 +771,7 @@ unsigned int gx_send_pu16_xy_midx (__u32 mem)
 {
 	float d[3], v[2] =
 	{
-		vdq * MEMR16 (mem), vdq * MEMR16 (mem + 2),
+		vdq * FIFO_U16 (mem), vdq * FIFO_U16 (mem + 2),
 	};
 
 
@@ -782,7 +787,7 @@ unsigned int gx_send_pu16_xyz_midx (__u32 mem)
 {
 	float d[3], v[3] =
 	{
-		vdq * MEMR16 (mem), vdq * MEMR16 (mem + 2), vdq * MEMR16 (mem + 4),
+		vdq * FIFO_U16 (mem), vdq * FIFO_U16 (mem + 2), vdq * FIFO_U16 (mem + 4),
 	};
 
 
@@ -798,7 +803,7 @@ unsigned int gx_send_ps16_xy_midx (__u32 mem)
 {
 	float d[3], v[2] =
 	{
-		vdq * MEMSR16 (mem), vdq * MEMSR16 (mem + 2),
+		vdq * FIFO_S16 (mem), vdq * FIFO_S16 (mem + 2),
 	};
 
 
@@ -814,7 +819,7 @@ unsigned int gx_send_ps16_xyz_midx (__u32 mem)
 {
 	float d[3], v[3] =
 	{
-		vdq * MEMSR16 (mem), vdq * MEMSR16 (mem + 2), vdq * MEMSR16 (mem + 4),
+		vdq * FIFO_S16 (mem), vdq * FIFO_S16 (mem + 2), vdq * FIFO_S16 (mem + 4),
 	};
 
 
@@ -830,7 +835,7 @@ unsigned int gx_send_pf_xy_midx (__u32 mem)
 {
 	float d[3], v[2] =
 	{
-		MEMRF (mem), MEMRF (mem + 4),
+		FIFO_F (mem), FIFO_F (mem + 4),
 	};
 
 
@@ -846,7 +851,7 @@ unsigned int gx_send_pf_xyz_midx (__u32 mem)
 {
 	float d[3], v[3] =
 	{
-		MEMRF (mem), MEMRF (mem + 4), MEMRF (mem + 8),
+		FIFO_F (mem), FIFO_F (mem + 4), FIFO_F (mem + 8),
 	};
 
 
@@ -861,7 +866,7 @@ unsigned int gx_send_pf_xyz_midx (__u32 mem)
 // 8 bit indexed position
 unsigned int gx_send_pi8u8_xy_midx (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		vdq * p[0], vdq * p[1],
@@ -878,7 +883,7 @@ unsigned int gx_send_pi8u8_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi8u8_xyz_midx (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		vdq * p[0], vdq * p[1], vdq * p[2],
@@ -895,7 +900,7 @@ unsigned int gx_send_pi8u8_xyz_midx (__u32 mem)
 
 unsigned int gx_send_pi8s8_xy_midx (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		vdq * p[0], vdq * p[1],
@@ -912,7 +917,7 @@ unsigned int gx_send_pi8s8_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi8s8_xyz_midx (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		vdq * p[0], vdq * p[1], vdq * p[2],
@@ -929,7 +934,7 @@ unsigned int gx_send_pi8s8_xyz_midx (__u32 mem)
 
 unsigned int gx_send_pi8u16_xy_midx (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		vdq * BSWAP16 (p[0]), vdq * BSWAP16 (p[1]),
@@ -946,7 +951,7 @@ unsigned int gx_send_pi8u16_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi8u16_xyz_midx (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		vdq * BSWAP16 (p[0]), vdq * BSWAP16 (p[1]), vdq * BSWAP16 (p[2]),
@@ -963,7 +968,7 @@ unsigned int gx_send_pi8u16_xyz_midx (__u32 mem)
 
 unsigned int gx_send_pi8s16_xy_midx (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		vdq * BSWAPS16 (p[0]), vdq * BSWAPS16 (p[1]),
@@ -980,7 +985,7 @@ unsigned int gx_send_pi8s16_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi8s16_xyz_midx (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		vdq * BSWAPS16 (p[0]), vdq * BSWAPS16 (p[1]), vdq * BSWAPS16 (p[2]),
@@ -997,7 +1002,7 @@ unsigned int gx_send_pi8s16_xyz_midx (__u32 mem)
 
 unsigned int gx_send_pi8f_xy_midx (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		BSWAPF (p[0]), BSWAPF (p[1]),
@@ -1014,7 +1019,7 @@ unsigned int gx_send_pi8f_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi8f_xyz_midx (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]),
@@ -1032,7 +1037,7 @@ unsigned int gx_send_pi8f_xyz_midx (__u32 mem)
 // 16 bit indexed position
 unsigned int gx_send_pi16u8_xy_midx (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		vdq * p[0], vdq * p[1],
@@ -1049,7 +1054,7 @@ unsigned int gx_send_pi16u8_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi16u8_xyz_midx (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		vdq * p[0], vdq * p[1], vdq * p[2],
@@ -1066,7 +1071,7 @@ unsigned int gx_send_pi16u8_xyz_midx (__u32 mem)
 
 unsigned int gx_send_pi16s8_xy_midx (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		vdq * p[0], vdq * p[1],
@@ -1083,7 +1088,7 @@ unsigned int gx_send_pi16s8_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi16s8_xyz_midx (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		vdq * p[0], vdq * p[1], vdq * p[2],
@@ -1100,7 +1105,7 @@ unsigned int gx_send_pi16s8_xyz_midx (__u32 mem)
 
 unsigned int gx_send_pi16u16_xy_midx (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		vdq * BSWAP16 (p[0]), vdq * BSWAP16 (p[1]),
@@ -1117,7 +1122,7 @@ unsigned int gx_send_pi16u16_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi16u16_xyz_midx (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		vdq * BSWAP16 (p[0]), vdq * BSWAP16 (p[1]), vdq * BSWAP16 (p[2]),
@@ -1134,7 +1139,7 @@ unsigned int gx_send_pi16u16_xyz_midx (__u32 mem)
 
 unsigned int gx_send_pi16s16_xy_midx (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		vdq * BSWAPS16 (p[0]), vdq * BSWAPS16 (p[1]),
@@ -1151,7 +1156,7 @@ unsigned int gx_send_pi16s16_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi16s16_xyz_midx (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		vdq * BSWAPS16 (p[0]), vdq * BSWAPS16 (p[1]), vdq * BSWAPS16 (p[2]),
@@ -1168,7 +1173,7 @@ unsigned int gx_send_pi16s16_xyz_midx (__u32 mem)
 
 unsigned int gx_send_pi16f_xy_midx (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[2] =
 	{
 		BSWAPF (p[0]), BSWAPF (p[1]),
@@ -1185,7 +1190,7 @@ unsigned int gx_send_pi16f_xy_midx (__u32 mem)
 
 unsigned int gx_send_pi16f_xyz_midx (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 	float d[3], v[3] =
 	{
 		BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]),
@@ -1495,7 +1500,7 @@ static unsigned int gxnormal_size[] =
 // direct color
 unsigned int gx_send_c_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (mem));
+	__u32 c = color_unpack_rgb565 (FIFO_U16 (mem));
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1508,7 +1513,7 @@ unsigned int gx_send_c_rgb565 (__u32 mem)
 
 unsigned int gx_send_c_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1521,7 +1526,7 @@ unsigned int gx_send_c_rgb8 (__u32 mem)
 
 unsigned int gx_send_c_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1534,7 +1539,7 @@ unsigned int gx_send_c_rgbx8 (__u32 mem)
 
 unsigned int gx_send_c_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (mem) >> 16);
+	__u32 c = color_unpack_rgba4 (FIFO_U32 (mem) >> 16);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1548,7 +1553,7 @@ unsigned int gx_send_c_rgba4 (__u32 mem)
 
 unsigned int gx_send_c_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (mem) >> 8);
+	__u32 c = color_unpack_rgba6 (FIFO_U32 (mem) >> 8);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1561,7 +1566,7 @@ unsigned int gx_send_c_rgba6 (__u32 mem)
 
 unsigned int gx_send_c_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1575,7 +1580,7 @@ unsigned int gx_send_c_rgba8 (__u32 mem)
 // 8 bit indexed color
 unsigned int gx_send_ci8_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE));
+	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1588,7 +1593,7 @@ unsigned int gx_send_ci8_rgb565 (__u32 mem)
 
 unsigned int gx_send_ci8_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1601,7 +1606,7 @@ unsigned int gx_send_ci8_rgb8 (__u32 mem)
 
 unsigned int gx_send_ci8_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1614,7 +1619,7 @@ unsigned int gx_send_ci8_rgbx8 (__u32 mem)
 
 unsigned int gx_send_ci8_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16);
+	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1628,7 +1633,7 @@ unsigned int gx_send_ci8_rgba4 (__u32 mem)
 
 unsigned int gx_send_ci8_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8);
+	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1641,7 +1646,7 @@ unsigned int gx_send_ci8_rgba6 (__u32 mem)
 
 unsigned int gx_send_ci8_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1655,7 +1660,7 @@ unsigned int gx_send_ci8_rgba8 (__u32 mem)
 // 16 bit indexed color
 unsigned int gx_send_ci16_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE));
+	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1668,7 +1673,7 @@ unsigned int gx_send_ci16_rgb565 (__u32 mem)
 
 unsigned int gx_send_ci16_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1681,7 +1686,7 @@ unsigned int gx_send_ci16_rgb8 (__u32 mem)
 
 unsigned int gx_send_ci16_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%6.6x)", c);
@@ -1694,7 +1699,7 @@ unsigned int gx_send_ci16_rgbx8 (__u32 mem)
 
 unsigned int gx_send_ci16_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16);
+	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1708,7 +1713,7 @@ unsigned int gx_send_ci16_rgba4 (__u32 mem)
 
 unsigned int gx_send_ci16_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8);
+	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1721,7 +1726,7 @@ unsigned int gx_send_ci16_rgba6 (__u32 mem)
 
 unsigned int gx_send_ci16_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  color (%8.8x)", c);
@@ -1789,7 +1794,7 @@ static unsigned int gxcol_size[] =
 // fake color
 unsigned int gx_send_fake_c_rgb565 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", color_unpack_rgb565 (MEMR16 (mem)));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", color_unpack_rgb565 (FIFO_U16 (mem)));
 
 	return 2;
 }
@@ -1797,7 +1802,7 @@ unsigned int gx_send_fake_c_rgb565 (__u32 mem)
 
 unsigned int gx_send_fake_c_rgb8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (mem));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", FIFO_U32_NS (mem));
 
 	return 3;
 }
@@ -1805,7 +1810,7 @@ unsigned int gx_send_fake_c_rgb8 (__u32 mem)
 
 unsigned int gx_send_fake_c_rgbx8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (mem));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", FIFO_U32_NS (mem));
 
 	return 4;
 }
@@ -1813,7 +1818,7 @@ unsigned int gx_send_fake_c_rgbx8 (__u32 mem)
 
 unsigned int gx_send_fake_c_rgba4 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba4 (MEMR32 (mem) >> 16));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba4 (FIFO_U32 (mem) >> 16));
 
 	return 2;
 }
@@ -1821,7 +1826,7 @@ unsigned int gx_send_fake_c_rgba4 (__u32 mem)
 
 unsigned int gx_send_fake_c_rgba6 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba6 (MEMR32 (mem) >> 8));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba6 (FIFO_U32 (mem) >> 8));
 
 	return 3;
 }
@@ -1829,7 +1834,7 @@ unsigned int gx_send_fake_c_rgba6 (__u32 mem)
 
 unsigned int gx_send_fake_c_rgba8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", MEM32 (mem));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", FIFO_U32_NS (mem));
 
 	return 4;
 }
@@ -1838,7 +1843,7 @@ unsigned int gx_send_fake_c_rgba8 (__u32 mem)
 // 8 bit indexed color
 unsigned int gx_send_fake_ci8_rgb565 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE)));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE)));
 
 	return 1;
 }
@@ -1846,7 +1851,7 @@ unsigned int gx_send_fake_ci8_rgb565 (__u32 mem)
 
 unsigned int gx_send_fake_ci8_rgb8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 	return 1;
 }
@@ -1854,7 +1859,7 @@ unsigned int gx_send_fake_ci8_rgb8 (__u32 mem)
 
 unsigned int gx_send_fake_ci8_rgbx8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 	return 1;
 }
@@ -1862,7 +1867,7 @@ unsigned int gx_send_fake_ci8_rgbx8 (__u32 mem)
 
 unsigned int gx_send_fake_ci8_rgba4 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16));
 
 	return 1;
 }
@@ -1870,7 +1875,7 @@ unsigned int gx_send_fake_ci8_rgba4 (__u32 mem)
 
 unsigned int gx_send_fake_ci8_rgba6 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8));
 
 	return 1;
 }
@@ -1878,7 +1883,7 @@ unsigned int gx_send_fake_ci8_rgba6 (__u32 mem)
 
 unsigned int gx_send_fake_ci8_rgba8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 	return 1;
 }
@@ -1887,7 +1892,7 @@ unsigned int gx_send_fake_ci8_rgba8 (__u32 mem)
 // 16 bit indexed color
 unsigned int gx_send_fake_ci16_rgb565 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE)));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE)));
 
 	return 2;
 }
@@ -1895,7 +1900,7 @@ unsigned int gx_send_fake_ci16_rgb565 (__u32 mem)
 
 unsigned int gx_send_fake_ci16_rgb8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 	return 2;
 }
@@ -1903,7 +1908,7 @@ unsigned int gx_send_fake_ci16_rgb8 (__u32 mem)
 
 unsigned int gx_send_fake_ci16_rgbx8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%6.6x)", MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 	return 2;
 }
@@ -1911,7 +1916,7 @@ unsigned int gx_send_fake_ci16_rgbx8 (__u32 mem)
 
 unsigned int gx_send_fake_ci16_rgba4 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16));
 
 	return 2;
 }
@@ -1919,7 +1924,7 @@ unsigned int gx_send_fake_ci16_rgba4 (__u32 mem)
 
 unsigned int gx_send_fake_ci16_rgba6 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8));
 
 	return 2;
 }
@@ -1927,7 +1932,7 @@ unsigned int gx_send_fake_ci16_rgba6 (__u32 mem)
 
 unsigned int gx_send_fake_ci16_rgba8 (__u32 mem)
 {
-	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE));
+	LOG_FAKE (EVENT_LOG_GX, "....  color~(%8.8x)", MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 	return 2;
 }
@@ -1976,9 +1981,9 @@ static unsigned int (*gxcol_fake[]) (__u32 mem) =
 // direct texture
 unsigned int gx_send_tu8_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", MEM (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", FIFO_U8 (mem));
 
-	glTexCoord1s (MEM (mem));
+	glTexCoord1s (FIFO_U8 (mem));
 
 	return 1;
 }
@@ -1986,9 +1991,9 @@ unsigned int gx_send_tu8_s (__u32 mem)
 
 unsigned int gx_send_tu8_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", MEM (mem), MEM (mem + 1));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", FIFO_U8 (mem), FIFO_U8 (mem + 1));
 
-	glTexCoord2s (MEM (mem), MEM (mem + 1));
+	glTexCoord2s (FIFO_U8 (mem), FIFO_U8 (mem + 1));
 
 	return 2;
 }
@@ -1996,9 +2001,9 @@ unsigned int gx_send_tu8_st (__u32 mem)
 
 unsigned int gx_send_ts8_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", MEMS (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", FIFO_S8 (mem));
 
-	glTexCoord1s (MEMS (mem));
+	glTexCoord1s (FIFO_S8 (mem));
 
 	return 1;
 }
@@ -2006,9 +2011,9 @@ unsigned int gx_send_ts8_s (__u32 mem)
 
 unsigned int gx_send_ts8_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", MEMS (mem), MEMS (mem + 1));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", FIFO_S8 (mem), FIFO_S8 (mem + 1));
 
-	glTexCoord2s (MEMS (mem), MEMS (mem + 1));
+	glTexCoord2s (FIFO_S8 (mem), FIFO_S8 (mem + 1));
 
 	return 2;
 }
@@ -2016,9 +2021,9 @@ unsigned int gx_send_ts8_st (__u32 mem)
 
 unsigned int gx_send_tu16_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", MEMR16 (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", FIFO_U16 (mem));
 
-	glTexCoord1i (MEMR16 (mem));
+	glTexCoord1i (FIFO_U16 (mem));
 
 	return 2;
 }
@@ -2026,9 +2031,9 @@ unsigned int gx_send_tu16_s (__u32 mem)
 
 unsigned int gx_send_tu16_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", MEMR16 (mem), MEMR16 (mem + 2));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", FIFO_U16 (mem), FIFO_U16 (mem + 2));
 
-	glTexCoord2i (MEMR16 (mem), MEMR16 (mem + 2));
+	glTexCoord2i (FIFO_U16 (mem), FIFO_U16 (mem + 2));
 
 	return 4;
 }
@@ -2036,9 +2041,9 @@ unsigned int gx_send_tu16_st (__u32 mem)
 
 unsigned int gx_send_ts16_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", MEMSR16 (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", FIFO_S16 (mem));
 
-	glTexCoord1s (MEMSR16 (mem));
+	glTexCoord1s (FIFO_S16 (mem));
 
 	return 2;
 }
@@ -2046,9 +2051,9 @@ unsigned int gx_send_ts16_s (__u32 mem)
 
 unsigned int gx_send_ts16_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", MEMSR16 (mem), MEMSR16 (mem + 2));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", FIFO_S16 (mem), FIFO_S16 (mem + 2));
 
-	glTexCoord2s (MEMSR16 (mem), MEMSR16 (mem + 2));
+	glTexCoord2s (FIFO_S16 (mem), FIFO_S16 (mem + 2));
 
 	return 4;
 }
@@ -2056,9 +2061,9 @@ unsigned int gx_send_ts16_st (__u32 mem)
 
 unsigned int gx_send_tf_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f)", MEMRF (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f)", FIFO_F (mem));
 
-	glTexCoord1f (MEMRF (mem));
+	glTexCoord1f (FIFO_F (mem));
 
 	return 4;
 }
@@ -2066,9 +2071,9 @@ unsigned int gx_send_tf_s (__u32 mem)
 
 unsigned int gx_send_tf_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f, %.2f)", MEMRF (mem), MEMRF (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f, %.2f)", FIFO_F (mem), FIFO_F (mem + 4));
 
-	glTexCoord2f (MEMRF (mem), MEMRF (mem + 4));
+	glTexCoord2f (FIFO_F (mem), FIFO_F (mem + 4));
 
 	return 8;
 }
@@ -2077,7 +2082,7 @@ unsigned int gx_send_tf_st (__u32 mem)
 // 8 bit indexed texture
 unsigned int gx_send_ti8u8_s (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", p[0]);
@@ -2090,7 +2095,7 @@ unsigned int gx_send_ti8u8_s (__u32 mem)
 
 unsigned int gx_send_ti8u8_st (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", p[0], p[1]);
@@ -2103,7 +2108,7 @@ unsigned int gx_send_ti8u8_st (__u32 mem)
 
 unsigned int gx_send_ti8s8_s (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", p[0]);
@@ -2116,7 +2121,7 @@ unsigned int gx_send_ti8s8_s (__u32 mem)
 
 unsigned int gx_send_ti8s8_st (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", p[0], p[1]);
@@ -2129,7 +2134,7 @@ unsigned int gx_send_ti8s8_st (__u32 mem)
 
 unsigned int gx_send_ti8u16_s (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", BSWAP16 (p[0]));
@@ -2142,7 +2147,7 @@ unsigned int gx_send_ti8u16_s (__u32 mem)
 
 unsigned int gx_send_ti8u16_st (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]));
@@ -2155,7 +2160,7 @@ unsigned int gx_send_ti8u16_st (__u32 mem)
 
 unsigned int gx_send_ti8s16_s (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", BSWAPS16 (p[0]));
@@ -2168,7 +2173,7 @@ unsigned int gx_send_ti8s16_s (__u32 mem)
 
 unsigned int gx_send_ti8s16_st (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]));
@@ -2181,7 +2186,7 @@ unsigned int gx_send_ti8s16_st (__u32 mem)
 
 unsigned int gx_send_ti8f_s (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f)", BSWAPF (p[0]));
@@ -2194,7 +2199,7 @@ unsigned int gx_send_ti8f_s (__u32 mem)
 
 unsigned int gx_send_ti8f_st (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]));
@@ -2208,7 +2213,7 @@ unsigned int gx_send_ti8f_st (__u32 mem)
 // 16 bit indexed texture
 unsigned int gx_send_ti16u8_s (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", p[0]);
@@ -2221,7 +2226,7 @@ unsigned int gx_send_ti16u8_s (__u32 mem)
 
 unsigned int gx_send_ti16u8_st (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", p[0], p[1]);
@@ -2234,7 +2239,7 @@ unsigned int gx_send_ti16u8_st (__u32 mem)
 
 unsigned int gx_send_ti16s8_s (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", p[0]);
@@ -2247,7 +2252,7 @@ unsigned int gx_send_ti16s8_s (__u32 mem)
 
 unsigned int gx_send_ti16s8_st (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", p[0], p[1]);
@@ -2260,7 +2265,7 @@ unsigned int gx_send_ti16s8_st (__u32 mem)
 
 unsigned int gx_send_ti16u16_s (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", BSWAP16 (p[0]));
@@ -2273,7 +2278,7 @@ unsigned int gx_send_ti16u16_s (__u32 mem)
 
 unsigned int gx_send_ti16u16_st (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]));
@@ -2286,7 +2291,7 @@ unsigned int gx_send_ti16u16_st (__u32 mem)
 
 unsigned int gx_send_ti16s16_s (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", BSWAPS16 (p[0]));
@@ -2299,7 +2304,7 @@ unsigned int gx_send_ti16s16_s (__u32 mem)
 
 unsigned int gx_send_ti16s16_st (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]));
@@ -2312,7 +2317,7 @@ unsigned int gx_send_ti16s16_st (__u32 mem)
 
 unsigned int gx_send_ti16f_s (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f)", BSWAPF (p[0]));
@@ -2325,7 +2330,7 @@ unsigned int gx_send_ti16f_s (__u32 mem)
 
 unsigned int gx_send_ti16f_st (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]));
@@ -2413,8 +2418,8 @@ inline void transform_texcoord_st (float d[2], float v[2], int index)
 	float *m = &XFMAT_TEX (index);
 
 
-	d[0] = m[0]*v[0] + m[1]*v[1] + m[ 3];
-	d[1] = m[4]*v[0] + m[5]*v[1] + m[ 7];
+	d[0] = m[0]*v[0] + m[1]*v[1] + m[3];
+	d[1] = m[4]*v[0] + m[5]*v[1] + m[7];
 }
 
 
@@ -2426,6 +2431,17 @@ inline void transform_texcoord_stq (float d[3], float v[3], int index)
 	d[0] = m[0]*v[0] + m[1]*v[1] + m[ 2]*v[2] + m[ 3];
 	d[1] = m[4]*v[0] + m[5]*v[1] + m[ 6]*v[2] + m[ 7];
 	d[2] = m[8]*v[0] + m[9]*v[1] + m[10]*v[2] + m[11];
+}
+
+
+inline void transform_texcoord_2x4 (float d[3], float v[3], int index)
+{
+	float *m = &XFMAT_TEX (index);
+
+
+	d[0] = m[0]*v[0] + m[1]*v[1] + m[2]*v[2] + m[3];
+	d[1] = m[4]*v[0] + m[5]*v[1] + m[6]*v[2] + m[7];
+	d[2] = 1;
 }
 
 
@@ -2445,7 +2461,7 @@ unsigned int gx_send_tu8_s_midx (__u32 mem)
 {
 	float d[1], v[1] =
 	{
-		tdq[0] * MEM (mem),
+		tdq[0] * FIFO_U8 (mem),
 	};
 
 
@@ -2462,7 +2478,7 @@ unsigned int gx_send_tu8_st_midx (__u32 mem)
 {
 	float d[2], v[2] =
 	{
-		tdq[0] * MEM (mem), tdq[0] * MEM (mem + 1),
+		tdq[0] * FIFO_U8 (mem), tdq[0] * FIFO_U8 (mem + 1),
 	};
 
 
@@ -2479,7 +2495,7 @@ unsigned int gx_send_ts8_s_midx (__u32 mem)
 {
 	float d[1], v[1] =
 	{
-		tdq[0] * MEMS (mem),
+		tdq[0] * FIFO_S8 (mem),
 	};
 
 
@@ -2496,7 +2512,7 @@ unsigned int gx_send_ts8_st_midx (__u32 mem)
 {
 	float d[2], v[2] =
 	{
-		tdq[0] * MEMS (mem), tdq[0] * MEMS (mem + 1),
+		tdq[0] * FIFO_S8 (mem), tdq[0] * FIFO_S8 (mem + 1),
 	};
 
 
@@ -2513,7 +2529,7 @@ unsigned int gx_send_tu16_s_midx (__u32 mem)
 {
 	float d[1], v[1] =
 	{
-		tdq[0] * MEMR16 (mem),
+		tdq[0] * FIFO_U16 (mem),
 	};
 
 
@@ -2530,7 +2546,7 @@ unsigned int gx_send_tu16_st_midx (__u32 mem)
 {
 	float d[2], v[2] =
 	{
-		tdq[0] * MEMR16 (mem), tdq[0] * MEMR16 (mem + 2),
+		tdq[0] * FIFO_U16 (mem), tdq[0] * FIFO_U16 (mem + 2),
 	};
 
 
@@ -2547,7 +2563,7 @@ unsigned int gx_send_ts16_s_midx (__u32 mem)
 {
 	float d[1], v[1] =
 	{
-		tdq[0] * MEMSR16 (mem),
+		tdq[0] * FIFO_S16 (mem),
 	};
 
 
@@ -2564,7 +2580,7 @@ unsigned int gx_send_ts16_st_midx (__u32 mem)
 {
 	float d[2], v[2] =
 	{
-		tdq[0] * MEMSR16 (mem), tdq[0] * MEMSR16 (mem + 2),
+		tdq[0] * FIFO_S16 (mem), tdq[0] * FIFO_S16 (mem + 2),
 	};
 
 
@@ -2581,7 +2597,7 @@ unsigned int gx_send_tf_s_midx (__u32 mem)
 {
 	float d[1], v[1] =
 	{
-		tdq[0] * MEMRF (mem),
+		tdq[0] * FIFO_F (mem),
 	};
 
 
@@ -2598,7 +2614,7 @@ unsigned int gx_send_tf_st_midx (__u32 mem)
 {
 	float d[2], v[2] =
 	{
-		tdq[0] * MEMRF (mem), tdq[0] * MEMRF (mem + 4),
+		tdq[0] * FIFO_F (mem), tdq[0] * FIFO_F (mem + 4),
 	};
 
 
@@ -2614,7 +2630,7 @@ unsigned int gx_send_tf_st_midx (__u32 mem)
 // 8 bit indexed texture
 unsigned int gx_send_ti8u8_s_midx (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * p[0],
@@ -2632,7 +2648,7 @@ unsigned int gx_send_ti8u8_s_midx (__u32 mem)
 
 unsigned int gx_send_ti8u8_st_midx (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * p[0], tdq[0] * p[1],
@@ -2650,7 +2666,7 @@ unsigned int gx_send_ti8u8_st_midx (__u32 mem)
 
 unsigned int gx_send_ti8s8_s_midx (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * p[0],
@@ -2668,7 +2684,7 @@ unsigned int gx_send_ti8s8_s_midx (__u32 mem)
 
 unsigned int gx_send_ti8s8_st_midx (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * p[0], tdq[0] * p[1],
@@ -2686,7 +2702,7 @@ unsigned int gx_send_ti8s8_st_midx (__u32 mem)
 
 unsigned int gx_send_ti8u16_s_midx (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * BSWAP16 (p[0]),
@@ -2704,7 +2720,7 @@ unsigned int gx_send_ti8u16_s_midx (__u32 mem)
 
 unsigned int gx_send_ti8u16_st_midx (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * BSWAP16 (p[0]), tdq[0] * BSWAP16 (p[1]),
@@ -2722,7 +2738,7 @@ unsigned int gx_send_ti8u16_st_midx (__u32 mem)
 
 unsigned int gx_send_ti8s16_s_midx (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * BSWAPS16 (p[0]),
@@ -2740,7 +2756,7 @@ unsigned int gx_send_ti8s16_s_midx (__u32 mem)
 
 unsigned int gx_send_ti8s16_st_midx (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * BSWAPS16 (p[0]), tdq[0] * BSWAPS16 (p[1]),
@@ -2758,7 +2774,7 @@ unsigned int gx_send_ti8s16_st_midx (__u32 mem)
 
 unsigned int gx_send_ti8f_s_midx (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * BSWAPF (p[0]),
@@ -2776,7 +2792,7 @@ unsigned int gx_send_ti8f_s_midx (__u32 mem)
 
 unsigned int gx_send_ti8f_st_midx (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * BSWAPF (p[0]), tdq[0] * BSWAPF (p[1]),
@@ -2795,7 +2811,7 @@ unsigned int gx_send_ti8f_st_midx (__u32 mem)
 // 16 bit indexed texture
 unsigned int gx_send_ti16u8_s_midx (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * p[0],
@@ -2813,7 +2829,7 @@ unsigned int gx_send_ti16u8_s_midx (__u32 mem)
 
 unsigned int gx_send_ti16u8_st_midx (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * p[0], tdq[0] * p[1],
@@ -2831,7 +2847,7 @@ unsigned int gx_send_ti16u8_st_midx (__u32 mem)
 
 unsigned int gx_send_ti16s8_s_midx (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * p[0],
@@ -2849,7 +2865,7 @@ unsigned int gx_send_ti16s8_s_midx (__u32 mem)
 
 unsigned int gx_send_ti16s8_st_midx (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * p[0], tdq[0] * p[1],
@@ -2867,7 +2883,7 @@ unsigned int gx_send_ti16s8_st_midx (__u32 mem)
 
 unsigned int gx_send_ti16u16_s_midx (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * BSWAP16 (p[0]),
@@ -2885,7 +2901,7 @@ unsigned int gx_send_ti16u16_s_midx (__u32 mem)
 
 unsigned int gx_send_ti16u16_st_midx (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * BSWAP16 (p[0]), tdq[0] * BSWAP16 (p[1]),
@@ -2903,7 +2919,7 @@ unsigned int gx_send_ti16u16_st_midx (__u32 mem)
 
 unsigned int gx_send_ti16s16_s_midx (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * BSWAPS16 (p[0]),
@@ -2921,7 +2937,7 @@ unsigned int gx_send_ti16s16_s_midx (__u32 mem)
 
 unsigned int gx_send_ti16s16_st_midx (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * BSWAPS16 (p[0]), tdq[0] * BSWAPS16 (p[1]),
@@ -2939,7 +2955,7 @@ unsigned int gx_send_ti16s16_st_midx (__u32 mem)
 
 unsigned int gx_send_ti16f_s_midx (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[1], v[1] =
 	{
 		tdq[0] * BSWAPF (p[0]),
@@ -2957,7 +2973,7 @@ unsigned int gx_send_ti16f_s_midx (__u32 mem)
 
 unsigned int gx_send_ti16f_st_midx (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 	float d[2], v[2] =
 	{
 		tdq[0] * BSWAPF (p[0]), tdq[0] * BSWAPF (p[1]),
@@ -3330,6 +3346,53 @@ void gx_load_texture_matrix (unsigned int index, int p2)
 }
 
 
+inline unsigned int gx_list_size (unsigned int n, int vat)
+{
+	unsigned int size = 0;
+
+
+	// matrix indices
+	if (VCD_MIDX)
+	{
+		if (VCD_PMIDX)
+			size++;
+
+		if (VCD_T0MIDX)
+			size++;
+
+		if (VCD_T1MIDX)
+			size++;
+		if (VCD_T2MIDX)
+			size++;
+		if (VCD_T3MIDX)
+			size++;
+		if (VCD_T4MIDX)
+			size++;
+		if (VCD_T5MIDX)
+			size++;
+		if (VCD_T6MIDX)
+			size++;
+		if (VCD_T7MIDX)
+			size++;
+	}
+
+	size += gxnormal_size[GXIDX (NORMAL, vat)];
+	size += gxcol_size[GXIDX (COL0, vat)];
+	size += gxcol_size[GXIDX (COL1, vat)];
+	size += gxtex_size[GXIDX (TEX0, vat)];
+	size += gxtex_size[GXIDX (TEX1, vat)];
+	size += gxtex_size[GXIDX (TEX2, vat)];
+	size += gxtex_size[GXIDX (TEX3, vat)];
+	size += gxtex_size[GXIDX (TEX4, vat)];
+	size += gxtex_size[GXIDX (TEX5, vat)];
+	size += gxtex_size[GXIDX (TEX6, vat)];
+	size += gxtex_size[GXIDX (TEX7, vat)];
+	size += gxpos_size[GXIDX (POS, vat)];
+
+	return size * n;
+}
+
+
 unsigned int gx_draw_old (__u32 mem, int prim, int n, int vat)
 {
 	unsigned int (*midx[16]) (__u32 mem);
@@ -3341,51 +3404,7 @@ unsigned int gx_draw_old (__u32 mem, int prim, int n, int vat)
 
 	if (!n)
 		return 0;
-
-	// matrix indices
-	if (VCD_MIDX)
-	{
-		if (VCD_PMIDX)
-			midx[nm++] = gx_send_pmidx;
-
-		if (VCD_T0MIDX)
-			midx[nm++] = gx_send_t0midx;
-
-		if (VCD_T1MIDX)
-			midx[nm++] = gx_send_t1midx;
-		if (VCD_T2MIDX)
-			midx[nm++] = gx_send_t2midx;
-		if (VCD_T3MIDX)
-			midx[nm++] = gx_send_t3midx;
-		if (VCD_T4MIDX)
-			midx[nm++] = gx_send_t4midx;
-		if (VCD_T5MIDX)
-			midx[nm++] = gx_send_t5midx;
-		if (VCD_T6MIDX)
-			midx[nm++] = gx_send_t6midx;
-		if (VCD_T7MIDX)
-			midx[nm++] = gx_send_t7midx;
-	}
-
-	list_size += nm;
-	list_size += gxnormal_size[GXIDX (NORMAL, vat)];
-	list_size += gxcol_size[GXIDX (COL0, vat)];
-	list_size += gxcol_size[GXIDX (COL1, vat)];
-	list_size += gxtex_size[GXIDX (TEX0, vat)];
-	list_size += gxtex_size[GXIDX (TEX1, vat)];
-	list_size += gxtex_size[GXIDX (TEX2, vat)];
-	list_size += gxtex_size[GXIDX (TEX3, vat)];
-	list_size += gxtex_size[GXIDX (TEX4, vat)];
-	list_size += gxtex_size[GXIDX (TEX5, vat)];
-	list_size += gxtex_size[GXIDX (TEX6, vat)];
-	list_size += gxtex_size[GXIDX (TEX7, vat)];
-	list_size += gxpos_size[GXIDX (POS, vat)];
-	if (EXCEEDES_LIST_BOUNDARY (start, list_size * n + 3))
-	// draw commands take 3 bytes and return 3 + gx_draw
-		return -(list_size * n + 6);
-
-	if (CP_MATRIX_INDEX_0 != XF_MATRIX_INDEX_0)
-		DEBUG (EVENT_STOP, ".gx:  CP_MATRIX_INDEX_0 is different than XF_MATRIX_INDEX_0");
+	list_size = gx_list_size (n, vat);
 
 	DEBUG (EVENT_LOG_GX, "....  VCD MIDX %2.2x POS %d NORMAL %d COL %d|%d TEX %d|%d|%d|%d|%d|%d|%d|%d",
 											 VCD_MIDX, VCD_POS, VCD_NORMAL, VCD_COL0, VCD_COL1,
@@ -3418,7 +3437,32 @@ unsigned int gx_draw_old (__u32 mem, int prim, int n, int vat)
 	if (gxswitches.dont_draw)
 	{
 		gcube_perf_vertices (n);
-		return list_size * n;
+		return list_size;
+	}
+
+	// matrix indices
+	if (VCD_MIDX)
+	{
+		if (VCD_PMIDX)
+			midx[nm++] = gx_send_pmidx;
+
+		if (VCD_T0MIDX)
+			midx[nm++] = gx_send_t0midx;
+
+		if (VCD_T1MIDX)
+			midx[nm++] = gx_send_t1midx;
+		if (VCD_T2MIDX)
+			midx[nm++] = gx_send_t2midx;
+		if (VCD_T3MIDX)
+			midx[nm++] = gx_send_t3midx;
+		if (VCD_T4MIDX)
+			midx[nm++] = gx_send_t4midx;
+		if (VCD_T5MIDX)
+			midx[nm++] = gx_send_t5midx;
+		if (VCD_T6MIDX)
+			midx[nm++] = gx_send_t6midx;
+		if (VCD_T7MIDX)
+			midx[nm++] = gx_send_t7midx;
 	}
 
 	// normal (faked)
@@ -3532,23 +3576,6 @@ unsigned int gx_draw_old (__u32 mem, int prim, int n, int vat)
 					glScalef (tdq[0] * TEX_SSIZE (0), tdq[0] * TEX_TSIZE (0), tdq[0]);
 			}
 
-			if (texactive[0] == &tag_render_target)
-			{
-				// need to flip the render target
-				if (tag_render_target.xfb_mipmap)
-				{
-					glTranslatef (0.5 / tdq[0] , 0.5 / tdq[0], 0);
-					glScalef (2, -2, 1);
-					glTranslatef (-0.5 * 0.5 / tdq[0] , -0.5 * 1.5 / tdq[0], 0);
-				}
-				else
-				{
-					glTranslatef (0.5 / tdq[0] , 0.5 / tdq[0], 0);
-					glScalef (1, -1, 1);
-					glTranslatef (-0.5 / tdq[0] , -0.5 / tdq[0], 0);
-				}
-			}
-
 			glMatrixMode (GL_MODELVIEW);
 		}
 		else
@@ -3626,9 +3653,6 @@ unsigned int gx_draw_old (__u32 mem, int prim, int n, int vat)
 
 	gcube_perf_vertices (n);
 
-	if (list_size * n != (mem - start))
-		DEBUG (EVENT_STOP, ".gx: incorrect calculation of list_size");
-
 	return (mem - start);
 }
 
@@ -3636,7 +3660,6 @@ unsigned int gx_draw_old (__u32 mem, int prim, int n, int vat)
 
 
 // below this point everything belongs to the new engine
-// only first texture stage is implemented.
 
 typedef struct
 {
@@ -3648,15 +3671,16 @@ typedef struct
 } GXTFVertex;
 
 GXTFVertex varray[0x0fffff];
+GXTFVertex tvarray[0x0fffff];
 int cvertex;
 GXTFVertex *cv;
 
 float material[2][4], ambient[2][4];
-int ncolors, ntextures;
+int ncolors, ntextures, ctex = 0;
 
 
-#define GX_TEX_COORD_1(S)				({cv->tex[0][0] = S; cv->tex[0][1] = 0;})
-#define GX_TEX_COORD_2(S,T)			({cv->tex[0][0] = S; cv->tex[0][1] = T;})
+#define GX_TEX_COORD_1(S)				({cv->tex[ctex][0] = S; cv->tex[ctex][1] = 0; cv->tex[ctex][2] = 0; ctex = (ctex + 1) % ntextures;})
+#define GX_TEX_COORD_2(S,T)			({cv->tex[ctex][0] = S; cv->tex[ctex][1] = T; cv->tex[ctex][2] = 0; ctex = (ctex + 1) % ntextures;})
 #define GX_POS_COORD_2(X,Y)			({cv->pos[0] = X; cv->pos[1] = Y; cv->pos[2] = 0;})
 #define GX_POS_COORD_3(X,Y,Z)		({cv->pos[0] = X; cv->pos[1] = Y; cv->pos[2] = Z;})
 #define GX_COLOR0_3V(V)					({cv->color[0][0] = (float) (V)[0] / 0xff; cv->color[0][1] = (float) (V)[1] / 0xff; cv->color[0][2] = (float) (V)[2] / 0xff; cv->color[0][3] = 1;})
@@ -3731,9 +3755,9 @@ unsigned int gx_tf_send_ps8_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pu16_xy (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", MEMR16 (mem), MEMR16 (mem + 2));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", FIFO_U16 (mem), FIFO_U16 (mem + 2));
 
-	GX_POS_COORD_2 (MEMR16 (mem), MEMR16 (mem + 2));
+	GX_POS_COORD_2 (FIFO_U16 (mem), FIFO_U16 (mem + 2));
 
 	return 4;
 }
@@ -3741,9 +3765,9 @@ unsigned int gx_tf_send_pu16_xy (__u32 mem)
 
 unsigned int gx_tf_send_pu16_xyz (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", MEMR16 (mem), MEMR16 (mem + 2), MEMR16 (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", FIFO_U16 (mem), FIFO_U16 (mem + 2), FIFO_U16 (mem + 4));
 
-	GX_POS_COORD_3 (MEMR16 (mem), MEMR16 (mem + 2), MEMR16 (mem + 4));
+	GX_POS_COORD_3 (FIFO_U16 (mem), FIFO_U16 (mem + 2), FIFO_U16 (mem + 4));
 
 	return 6;
 }
@@ -3751,9 +3775,9 @@ unsigned int gx_tf_send_pu16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_ps16_xy (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", MEMSR16 (mem), MEMSR16 (mem + 2));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", FIFO_S16 (mem), FIFO_S16 (mem + 2));
 
-	GX_POS_COORD_2 (MEMSR16 (mem), MEMSR16 (mem + 2));
+	GX_POS_COORD_2 (FIFO_S16 (mem), FIFO_S16 (mem + 2));
 
 	return 4;
 }
@@ -3761,9 +3785,9 @@ unsigned int gx_tf_send_ps16_xy (__u32 mem)
 
 unsigned int gx_tf_send_ps16_xyz (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", MEMSR16 (mem), MEMSR16 (mem + 2), MEMSR16 (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", FIFO_S16 (mem), FIFO_S16 (mem + 2), FIFO_S16 (mem + 4));
 
-	GX_POS_COORD_3 (MEMSR16 (mem), MEMSR16 (mem + 2), MEMSR16 (mem + 4));
+	GX_POS_COORD_3 (FIFO_S16 (mem), FIFO_S16 (mem + 2), FIFO_S16 (mem + 4));
 
 	return 6;
 }
@@ -3771,9 +3795,9 @@ unsigned int gx_tf_send_ps16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pf_xy (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f)", MEMRF (mem), MEMRF (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f)", FIFO_F (mem), FIFO_F (mem + 4));
 
-	GX_POS_COORD_2 (MEMRF (mem), MEMRF (mem + 4));
+	GX_POS_COORD_2 (FIFO_F (mem), FIFO_F (mem + 4));
 
 	return 8;
 }
@@ -3781,9 +3805,9 @@ unsigned int gx_tf_send_pf_xy (__u32 mem)
 
 unsigned int gx_tf_send_pf_xyz (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f, %.2f)", MEMRF (mem), MEMRF (mem + 4), MEMRF (mem + 8));
+	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f, %.2f)", FIFO_F (mem), FIFO_F (mem + 4), FIFO_F (mem + 8));
 
-	GX_POS_COORD_3 (MEMRF (mem), MEMRF (mem + 4), MEMRF (mem + 8));
+	GX_POS_COORD_3 (FIFO_F (mem), FIFO_F (mem + 4), FIFO_F (mem + 8));
 
 	return 12;
 }
@@ -3792,7 +3816,7 @@ unsigned int gx_tf_send_pf_xyz (__u32 mem)
 // 8 bit indexed position
 unsigned int gx_tf_send_pi8u8_xy (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", p[0], p[1]);
@@ -3805,7 +3829,7 @@ unsigned int gx_tf_send_pi8u8_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi8u8_xyz (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", p[0], p[1], p[2]);
@@ -3818,7 +3842,7 @@ unsigned int gx_tf_send_pi8u8_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pi8s8_xy (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", p[0], p[1]);
@@ -3831,7 +3855,7 @@ unsigned int gx_tf_send_pi8s8_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi8s8_xyz (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", p[0], p[1], p[2]);
@@ -3844,7 +3868,7 @@ unsigned int gx_tf_send_pi8s8_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pi8u16_xy (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]));
@@ -3857,7 +3881,7 @@ unsigned int gx_tf_send_pi8u16_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi8u16_xyz (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]), BSWAP16 (p[2]));
@@ -3870,7 +3894,7 @@ unsigned int gx_tf_send_pi8u16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pi8s16_xy (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]));
@@ -3883,7 +3907,7 @@ unsigned int gx_tf_send_pi8s16_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi8s16_xyz (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]), BSWAPS16 (p[2]));
@@ -3896,7 +3920,7 @@ unsigned int gx_tf_send_pi8s16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pi8f_xy (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]));
@@ -3909,7 +3933,7 @@ unsigned int gx_tf_send_pi8f_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi8f_xyz (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEM (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U8 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]));
@@ -3923,7 +3947,7 @@ unsigned int gx_tf_send_pi8f_xyz (__u32 mem)
 // 16 bit indexed position
 unsigned int gx_tf_send_pi16u8_xy (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", p[0], p[1]);
@@ -3936,7 +3960,7 @@ unsigned int gx_tf_send_pi16u8_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi16u8_xyz (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", p[0], p[1], p[2]);
@@ -3949,7 +3973,7 @@ unsigned int gx_tf_send_pi16u8_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pi16s8_xy (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", p[0], p[1]);
@@ -3962,7 +3986,7 @@ unsigned int gx_tf_send_pi16s8_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi16s8_xyz (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", p[0], p[1], p[2]);
@@ -3975,7 +3999,7 @@ unsigned int gx_tf_send_pi16s8_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pi16u16_xy (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]));
@@ -3988,7 +4012,7 @@ unsigned int gx_tf_send_pi16u16_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi16u16_xyz (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__u16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]), BSWAP16 (p[2]));
@@ -4001,7 +4025,7 @@ unsigned int gx_tf_send_pi16u16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pi16s16_xy (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]));
@@ -4014,7 +4038,7 @@ unsigned int gx_tf_send_pi16s16_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi16s16_xyz (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%d, %d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]), BSWAPS16 (p[2]));
@@ -4027,7 +4051,7 @@ unsigned int gx_tf_send_pi16s16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_pi16f_xy (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]));
@@ -4040,7 +4064,7 @@ unsigned int gx_tf_send_pi16f_xy (__u32 mem)
 
 unsigned int gx_tf_send_pi16f_xyz (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + MEMR16 (mem) * CP_VERTEX_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_VERTEX_ARRAY_BASE + FIFO_U16 (mem) * CP_VERTEX_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  pos   (%.2f, %.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]));
@@ -4104,9 +4128,9 @@ static unsigned int (*gxpos_tf[]) (__u32 mem) =
 /////////////////////////////////////////////////////////////////////////////
 unsigned int gx_tf_send_tu8_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", MEM (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", FIFO_U8 (mem));
 
-	GX_TEX_COORD_1 (MEM (mem));
+	GX_TEX_COORD_1 (FIFO_U8 (mem));
 
 	return 1;
 }
@@ -4114,9 +4138,9 @@ unsigned int gx_tf_send_tu8_s (__u32 mem)
 
 unsigned int gx_tf_send_tu8_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", MEM (mem), MEM (mem + 1));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", FIFO_U8 (mem), FIFO_U8 (mem + 1));
 
-	GX_TEX_COORD_2 (MEM (mem), MEM (mem + 1));
+	GX_TEX_COORD_2 (FIFO_U8 (mem), FIFO_U8 (mem + 1));
 
 	return 2;
 }
@@ -4124,9 +4148,9 @@ unsigned int gx_tf_send_tu8_st (__u32 mem)
 
 unsigned int gx_tf_send_ts8_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", MEMS (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", FIFO_S8 (mem));
 
-	GX_TEX_COORD_1 (MEMS (mem));
+	GX_TEX_COORD_1 (FIFO_S8 (mem));
 
 	return 1;
 }
@@ -4134,9 +4158,9 @@ unsigned int gx_tf_send_ts8_s (__u32 mem)
 
 unsigned int gx_tf_send_ts8_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", MEMS (mem), MEMS (mem + 1));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", FIFO_S8 (mem), FIFO_S8 (mem + 1));
 
-	GX_TEX_COORD_2 (MEMS (mem), MEMS (mem + 1));
+	GX_TEX_COORD_2 (FIFO_S8 (mem), FIFO_S8 (mem + 1));
 
 	return 2;
 }
@@ -4144,9 +4168,9 @@ unsigned int gx_tf_send_ts8_st (__u32 mem)
 
 unsigned int gx_tf_send_tu16_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", MEMR16 (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", FIFO_U16 (mem));
 
-	GX_TEX_COORD_1 (MEMR16 (mem));
+	GX_TEX_COORD_1 (FIFO_U16 (mem));
 
 	return 2;
 }
@@ -4154,9 +4178,9 @@ unsigned int gx_tf_send_tu16_s (__u32 mem)
 
 unsigned int gx_tf_send_tu16_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", MEMR16 (mem), MEMR16 (mem + 2));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", FIFO_U16 (mem), FIFO_U16 (mem + 2));
 
-	GX_TEX_COORD_2 (MEMR16 (mem), MEMR16 (mem + 2));
+	GX_TEX_COORD_2 (FIFO_U16 (mem), FIFO_U16 (mem + 2));
 
 	return 4;
 }
@@ -4164,9 +4188,9 @@ unsigned int gx_tf_send_tu16_st (__u32 mem)
 
 unsigned int gx_tf_send_ts16_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", MEMSR16 (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", FIFO_S16 (mem));
 
-	GX_TEX_COORD_1 (MEMSR16 (mem));
+	GX_TEX_COORD_1 (FIFO_S16 (mem));
 
 	return 2;
 }
@@ -4174,9 +4198,9 @@ unsigned int gx_tf_send_ts16_s (__u32 mem)
 
 unsigned int gx_tf_send_ts16_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", MEMSR16 (mem), MEMSR16 (mem + 2));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", FIFO_S16 (mem), FIFO_S16 (mem + 2));
 
-	GX_TEX_COORD_2 (MEMSR16 (mem), MEMSR16 (mem + 2));
+	GX_TEX_COORD_2 (FIFO_S16 (mem), FIFO_S16 (mem + 2));
 
 	return 4;
 }
@@ -4184,9 +4208,9 @@ unsigned int gx_tf_send_ts16_st (__u32 mem)
 
 unsigned int gx_tf_send_tf_s (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f)", MEMRF (mem));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f)", FIFO_F (mem));
 
-	GX_TEX_COORD_1 (MEMRF (mem));
+	GX_TEX_COORD_1 (FIFO_F (mem));
 
 	return 4;
 }
@@ -4194,9 +4218,9 @@ unsigned int gx_tf_send_tf_s (__u32 mem)
 
 unsigned int gx_tf_send_tf_st (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f, %.2f)", MEMRF (mem), MEMRF (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f, %.2f)", FIFO_F (mem), FIFO_F (mem + 4));
 
-	GX_TEX_COORD_2 (MEMRF (mem), MEMRF (mem + 4));
+	GX_TEX_COORD_2 (FIFO_F (mem), FIFO_F (mem + 4));
 
 	return 8;
 }
@@ -4205,7 +4229,7 @@ unsigned int gx_tf_send_tf_st (__u32 mem)
 // 8 bit indexed texture
 unsigned int gx_tf_send_ti8u8_s (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", p[0]);
@@ -4218,7 +4242,7 @@ unsigned int gx_tf_send_ti8u8_s (__u32 mem)
 
 unsigned int gx_tf_send_ti8u8_st (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", p[0], p[1]);
@@ -4231,7 +4255,7 @@ unsigned int gx_tf_send_ti8u8_st (__u32 mem)
 
 unsigned int gx_tf_send_ti8s8_s (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", p[0]);
@@ -4244,7 +4268,7 @@ unsigned int gx_tf_send_ti8s8_s (__u32 mem)
 
 unsigned int gx_tf_send_ti8s8_st (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", p[0], p[1]);
@@ -4257,7 +4281,7 @@ unsigned int gx_tf_send_ti8s8_st (__u32 mem)
 
 unsigned int gx_tf_send_ti8u16_s (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", BSWAP16 (p[0]));
@@ -4270,7 +4294,7 @@ unsigned int gx_tf_send_ti8u16_s (__u32 mem)
 
 unsigned int gx_tf_send_ti8u16_st (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]));
@@ -4283,7 +4307,7 @@ unsigned int gx_tf_send_ti8u16_st (__u32 mem)
 
 unsigned int gx_tf_send_ti8s16_s (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", BSWAPS16 (p[0]));
@@ -4296,7 +4320,7 @@ unsigned int gx_tf_send_ti8s16_s (__u32 mem)
 
 unsigned int gx_tf_send_ti8s16_st (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]));
@@ -4309,7 +4333,7 @@ unsigned int gx_tf_send_ti8s16_st (__u32 mem)
 
 unsigned int gx_tf_send_ti8f_s (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f)", BSWAPF (p[0]));
@@ -4322,7 +4346,7 @@ unsigned int gx_tf_send_ti8f_s (__u32 mem)
 
 unsigned int gx_tf_send_ti8f_st (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEM (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U8 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]));
@@ -4336,7 +4360,7 @@ unsigned int gx_tf_send_ti8f_st (__u32 mem)
 // 16 bit indexed texture
 unsigned int gx_tf_send_ti16u8_s (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", p[0]);
@@ -4349,7 +4373,7 @@ unsigned int gx_tf_send_ti16u8_s (__u32 mem)
 
 unsigned int gx_tf_send_ti16u8_st (__u32 mem)
 {
-	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", p[0], p[1]);
@@ -4362,7 +4386,7 @@ unsigned int gx_tf_send_ti16u8_st (__u32 mem)
 
 unsigned int gx_tf_send_ti16s8_s (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", p[0]);
@@ -4375,7 +4399,7 @@ unsigned int gx_tf_send_ti16s8_s (__u32 mem)
 
 unsigned int gx_tf_send_ti16s8_st (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s8 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", p[0], p[1]);
@@ -4388,7 +4412,7 @@ unsigned int gx_tf_send_ti16s8_st (__u32 mem)
 
 unsigned int gx_tf_send_ti16u16_s (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", BSWAP16 (p[0]));
@@ -4401,7 +4425,7 @@ unsigned int gx_tf_send_ti16u16_s (__u32 mem)
 
 unsigned int gx_tf_send_ti16u16_st (__u32 mem)
 {
-	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__u16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", BSWAP16 (p[0]), BSWAP16 (p[1]));
@@ -4414,7 +4438,7 @@ unsigned int gx_tf_send_ti16u16_st (__u32 mem)
 
 unsigned int gx_tf_send_ti16s16_s (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d)", BSWAPS16 (p[0]));
@@ -4427,7 +4451,7 @@ unsigned int gx_tf_send_ti16s16_s (__u32 mem)
 
 unsigned int gx_tf_send_ti16s16_st (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	__s16 *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]));
@@ -4440,7 +4464,7 @@ unsigned int gx_tf_send_ti16s16_st (__u32 mem)
 
 unsigned int gx_tf_send_ti16f_s (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f)", BSWAPF (p[0]));
@@ -4453,7 +4477,7 @@ unsigned int gx_tf_send_ti16f_s (__u32 mem)
 
 unsigned int gx_tf_send_ti16f_st (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + MEMR16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
+	float *p = MEM_ADDRESS (CP_TEXTURE_ARRAY_BASE (0) + FIFO_U16 (mem) * CP_TEXTURE_ARRAY_STRIDE (0));
 
 
 	DEBUG (EVENT_LOG_GX, "....  tex   (%.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]));
@@ -4517,7 +4541,7 @@ static unsigned int (*gxtex_tf[]) (__u32 mem) =
 //////////////////////////////////////////////////////////////////////////////
 unsigned int gx_tf_send_c0_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (mem));
+	__u32 c = color_unpack_rgb565 (FIFO_U16 (mem));
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4528,7 +4552,7 @@ unsigned int gx_tf_send_c0_rgb565 (__u32 mem)
 
 unsigned int gx_tf_send_c0_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4539,7 +4563,7 @@ unsigned int gx_tf_send_c0_rgb8 (__u32 mem)
 
 unsigned int gx_tf_send_c0_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4550,7 +4574,7 @@ unsigned int gx_tf_send_c0_rgbx8 (__u32 mem)
 
 unsigned int gx_tf_send_c0_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (mem) >> 16);
+	__u32 c = color_unpack_rgba4 (FIFO_U32 (mem) >> 16);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4561,7 +4585,7 @@ unsigned int gx_tf_send_c0_rgba4 (__u32 mem)
 
 unsigned int gx_tf_send_c0_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (mem) >> 8);
+	__u32 c = color_unpack_rgba6 (FIFO_U32 (mem) >> 8);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4572,7 +4596,7 @@ unsigned int gx_tf_send_c0_rgba6 (__u32 mem)
 
 unsigned int gx_tf_send_c0_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4584,7 +4608,7 @@ unsigned int gx_tf_send_c0_rgba8 (__u32 mem)
 // 8 bit indexed color
 unsigned int gx_tf_send_c0i8_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE));
+	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4595,7 +4619,7 @@ unsigned int gx_tf_send_c0i8_rgb565 (__u32 mem)
 
 unsigned int gx_tf_send_c0i8_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4606,7 +4630,7 @@ unsigned int gx_tf_send_c0i8_rgb8 (__u32 mem)
 
 unsigned int gx_tf_send_c0i8_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4617,7 +4641,7 @@ unsigned int gx_tf_send_c0i8_rgbx8 (__u32 mem)
 
 unsigned int gx_tf_send_c0i8_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16);
+	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4628,7 +4652,7 @@ unsigned int gx_tf_send_c0i8_rgba4 (__u32 mem)
 
 unsigned int gx_tf_send_c0i8_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8);
+	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4639,7 +4663,7 @@ unsigned int gx_tf_send_c0i8_rgba6 (__u32 mem)
 
 unsigned int gx_tf_send_c0i8_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEM (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4651,7 +4675,7 @@ unsigned int gx_tf_send_c0i8_rgba8 (__u32 mem)
 // 16 bit indexed color
 unsigned int gx_tf_send_c0i16_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE));
+	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE));
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4662,7 +4686,7 @@ unsigned int gx_tf_send_c0i16_rgb565 (__u32 mem)
 
 unsigned int gx_tf_send_c0i16_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4673,7 +4697,7 @@ unsigned int gx_tf_send_c0i16_rgb8 (__u32 mem)
 
 unsigned int gx_tf_send_c0i16_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	GX_COLOR0_3V ((__u8 *) &c);
@@ -4684,7 +4708,7 @@ unsigned int gx_tf_send_c0i16_rgbx8 (__u32 mem)
 
 unsigned int gx_tf_send_c0i16_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16);
+	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 16);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4695,7 +4719,7 @@ unsigned int gx_tf_send_c0i16_rgba4 (__u32 mem)
 
 unsigned int gx_tf_send_c0i16_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8);
+	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE) >> 8);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4706,7 +4730,7 @@ unsigned int gx_tf_send_c0i16_rgba6 (__u32 mem)
 
 unsigned int gx_tf_send_c0i16_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + MEMR16 (mem) * CP_COLOR0_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR0_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR0_ARRAY_STRIDE);
 
 
 	GX_COLOR0_4V ((__u8 *) &c);
@@ -4759,7 +4783,7 @@ static unsigned int (*gxcol0_tf[]) (__u32 mem) =
 //////////////////////////////////////////////////////////////////////////////
 unsigned int gx_tf_send_c1_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (mem));
+	__u32 c = color_unpack_rgb565 (FIFO_U16 (mem));
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4770,7 +4794,7 @@ unsigned int gx_tf_send_c1_rgb565 (__u32 mem)
 
 unsigned int gx_tf_send_c1_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4781,7 +4805,7 @@ unsigned int gx_tf_send_c1_rgb8 (__u32 mem)
 
 unsigned int gx_tf_send_c1_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4792,7 +4816,7 @@ unsigned int gx_tf_send_c1_rgbx8 (__u32 mem)
 
 unsigned int gx_tf_send_c1_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (mem) >> 16);
+	__u32 c = color_unpack_rgba4 (FIFO_U32 (mem) >> 16);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -4803,7 +4827,7 @@ unsigned int gx_tf_send_c1_rgba4 (__u32 mem)
 
 unsigned int gx_tf_send_c1_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (mem) >> 8);
+	__u32 c = color_unpack_rgba6 (FIFO_U32 (mem) >> 8);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -4814,7 +4838,7 @@ unsigned int gx_tf_send_c1_rgba6 (__u32 mem)
 
 unsigned int gx_tf_send_c1_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (mem);
+	__u32 c = FIFO_U32_NS (mem);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -4826,7 +4850,7 @@ unsigned int gx_tf_send_c1_rgba8 (__u32 mem)
 // 8 bit indexed color
 unsigned int gx_tf_send_c1i8_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR1_ARRAY_BASE + MEM (mem) * CP_COLOR1_ARRAY_STRIDE));
+	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR1_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR1_ARRAY_STRIDE));
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4837,7 +4861,7 @@ unsigned int gx_tf_send_c1i8_rgb565 (__u32 mem)
 
 unsigned int gx_tf_send_c1i8_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + MEM (mem) * CP_COLOR1_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR1_ARRAY_STRIDE);
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4848,7 +4872,7 @@ unsigned int gx_tf_send_c1i8_rgb8 (__u32 mem)
 
 unsigned int gx_tf_send_c1i8_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + MEM (mem) * CP_COLOR1_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR1_ARRAY_STRIDE);
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4859,7 +4883,7 @@ unsigned int gx_tf_send_c1i8_rgbx8 (__u32 mem)
 
 unsigned int gx_tf_send_c1i8_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR1_ARRAY_BASE + MEM (mem) * CP_COLOR1_ARRAY_STRIDE) >> 16);
+	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR1_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR1_ARRAY_STRIDE) >> 16);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -4870,7 +4894,7 @@ unsigned int gx_tf_send_c1i8_rgba4 (__u32 mem)
 
 unsigned int gx_tf_send_c1i8_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR1_ARRAY_BASE + MEM (mem) * CP_COLOR1_ARRAY_STRIDE) >> 8);
+	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR1_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR1_ARRAY_STRIDE) >> 8);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -4881,7 +4905,7 @@ unsigned int gx_tf_send_c1i8_rgba6 (__u32 mem)
 
 unsigned int gx_tf_send_c1i8_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + MEM (mem) * CP_COLOR1_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + FIFO_U8 (mem) * CP_COLOR1_ARRAY_STRIDE);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -4893,7 +4917,7 @@ unsigned int gx_tf_send_c1i8_rgba8 (__u32 mem)
 // 16 bit indexed color
 unsigned int gx_tf_send_c1i16_rgb565 (__u32 mem)
 {
-	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR1_ARRAY_BASE + MEMR16 (mem) * CP_COLOR1_ARRAY_STRIDE));
+	__u32 c = color_unpack_rgb565 (MEMR16 (CP_COLOR1_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR1_ARRAY_STRIDE));
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4904,7 +4928,7 @@ unsigned int gx_tf_send_c1i16_rgb565 (__u32 mem)
 
 unsigned int gx_tf_send_c1i16_rgb8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + MEMR16 (mem) * CP_COLOR1_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR1_ARRAY_STRIDE);
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4915,7 +4939,7 @@ unsigned int gx_tf_send_c1i16_rgb8 (__u32 mem)
 
 unsigned int gx_tf_send_c1i16_rgbx8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + MEMR16 (mem) * CP_COLOR1_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR1_ARRAY_STRIDE);
 
 
 	GX_COLOR1_3V ((__u8 *) &c);
@@ -4926,7 +4950,7 @@ unsigned int gx_tf_send_c1i16_rgbx8 (__u32 mem)
 
 unsigned int gx_tf_send_c1i16_rgba4 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR1_ARRAY_BASE + MEMR16 (mem) * CP_COLOR1_ARRAY_STRIDE) >> 16);
+	__u32 c = color_unpack_rgba4 (MEMR32 (CP_COLOR1_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR1_ARRAY_STRIDE) >> 16);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -4937,7 +4961,7 @@ unsigned int gx_tf_send_c1i16_rgba4 (__u32 mem)
 
 unsigned int gx_tf_send_c1i16_rgba6 (__u32 mem)
 {
-	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR1_ARRAY_BASE + MEMR16 (mem) * CP_COLOR1_ARRAY_STRIDE) >> 8);
+	__u32 c = color_unpack_rgba6 (MEMR32 (CP_COLOR1_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR1_ARRAY_STRIDE) >> 8);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -4948,7 +4972,7 @@ unsigned int gx_tf_send_c1i16_rgba6 (__u32 mem)
 
 unsigned int gx_tf_send_c1i16_rgba8 (__u32 mem)
 {
-	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + MEMR16 (mem) * CP_COLOR1_ARRAY_STRIDE);
+	__u32 c = MEM32 (CP_COLOR1_ARRAY_BASE + FIFO_U16 (mem) * CP_COLOR1_ARRAY_STRIDE);
 
 
 	GX_COLOR1_4V ((__u8 *) &c);
@@ -5014,9 +5038,9 @@ unsigned int gx_tf_send_ns8_xyz (__u32 mem)
 
 unsigned int gx_tf_send_ns16_xyz (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", MEMSR16 (mem), MEMSR16 (mem + 2), MEMSR16 (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", FIFO_S16 (mem), FIFO_S16 (mem + 2), FIFO_S16 (mem + 4));
 
-	GX_NORMAL (MEMSR16 (mem), MEMSR16 (mem + 2), MEMSR16 (mem + 4));
+	GX_NORMAL (FIFO_S16 (mem), FIFO_S16 (mem + 2), FIFO_S16 (mem + 4));
 
 	return 6;
 }
@@ -5024,9 +5048,9 @@ unsigned int gx_tf_send_ns16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_nf_xyz (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", MEMRF (mem), MEMRF (mem + 4), MEMRF (mem + 8));
+	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", FIFO_F (mem), FIFO_F (mem + 4), FIFO_F (mem + 8));
 
-	GX_NORMAL (MEMRF (mem), MEMRF (mem + 4), MEMRF (mem + 8));
+	GX_NORMAL (FIFO_F (mem), FIFO_F (mem + 4), FIFO_F (mem + 8));
 
 	return 12;
 }
@@ -5049,13 +5073,13 @@ unsigned int gx_tf_send_ns8_nbt (__u32 mem)
 
 unsigned int gx_tf_send_ns16_nbt (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", MEMSR16 (mem), MEMSR16 (mem + 2), MEMSR16 (mem + 4));
-	DEBUG (EVENT_LOG_GX, "....  binormal (%d, %d, %d)", MEMSR16 (mem + 6), MEMSR16 (mem + 8), MEMSR16 (mem + 10));
-	DEBUG (EVENT_LOG_GX, "....  tangent (%d, %d, %d)", MEMSR16 (mem + 12), MEMSR16 (mem + 14), MEMSR16 (mem + 16));
+	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", FIFO_S16 (mem), FIFO_S16 (mem + 2), FIFO_S16 (mem + 4));
+	DEBUG (EVENT_LOG_GX, "....  binormal (%d, %d, %d)", FIFO_S16 (mem + 6), FIFO_S16 (mem + 8), FIFO_S16 (mem + 10));
+	DEBUG (EVENT_LOG_GX, "....  tangent (%d, %d, %d)", FIFO_S16 (mem + 12), FIFO_S16 (mem + 14), FIFO_S16 (mem + 16));
 
-	GX_NORMAL_N (MEMSR16 (mem +  0), MEMSR16 (mem +  2), MEMSR16 (mem +  4));
-	GX_NORMAL_B (MEMSR16 (mem +  6), MEMSR16 (mem +  8), MEMSR16 (mem + 10));
-	GX_NORMAL_T (MEMSR16 (mem + 12), MEMSR16 (mem + 14), MEMSR16 (mem + 16));
+	GX_NORMAL_N (FIFO_S16 (mem +  0), FIFO_S16 (mem +  2), FIFO_S16 (mem +  4));
+	GX_NORMAL_B (FIFO_S16 (mem +  6), FIFO_S16 (mem +  8), FIFO_S16 (mem + 10));
+	GX_NORMAL_T (FIFO_S16 (mem + 12), FIFO_S16 (mem + 14), FIFO_S16 (mem + 16));
 
 	return 18;
 }
@@ -5063,13 +5087,13 @@ unsigned int gx_tf_send_ns16_nbt (__u32 mem)
 
 unsigned int gx_tf_send_nf_nbt (__u32 mem)
 {
-	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", MEMRF (mem), MEMRF (mem + 4), MEMRF (mem + 8));
-	DEBUG (EVENT_LOG_GX, "....  binormal (%.2f, %.2f, %.2f)", MEMRF (mem + 12), MEMRF (mem + 16), MEMRF (mem + 20));
-	DEBUG (EVENT_LOG_GX, "....  tangent (%.2f, %.2f, %.2f)", MEMRF (mem + 24), MEMRF (mem + 28), MEMRF (mem + 32));
+	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", FIFO_F (mem), FIFO_F (mem + 4), FIFO_F (mem + 8));
+	DEBUG (EVENT_LOG_GX, "....  binormal (%.2f, %.2f, %.2f)", FIFO_F (mem + 12), FIFO_F (mem + 16), FIFO_F (mem + 20));
+	DEBUG (EVENT_LOG_GX, "....  tangent (%.2f, %.2f, %.2f)", FIFO_F (mem + 24), FIFO_F (mem + 28), FIFO_F (mem + 32));
 
-	GX_NORMAL_N (MEMRF (mem +  0), MEMRF (mem +  4), MEMRF (mem +  8));
-	GX_NORMAL_B (MEMRF (mem + 12), MEMRF (mem + 16), MEMRF (mem + 20));
-	GX_NORMAL_T (MEMRF (mem + 24), MEMRF (mem + 28), MEMRF (mem + 32));
+	GX_NORMAL_N (FIFO_F (mem +  0), FIFO_F (mem +  4), FIFO_F (mem +  8));
+	GX_NORMAL_B (FIFO_F (mem + 12), FIFO_F (mem + 16), FIFO_F (mem + 20));
+	GX_NORMAL_T (FIFO_F (mem + 24), FIFO_F (mem + 28), FIFO_F (mem + 32));
 
 	return 36;
 }
@@ -5078,7 +5102,7 @@ unsigned int gx_tf_send_nf_nbt (__u32 mem)
 // 8 bit indexed normal
 unsigned int gx_tf_send_ni8s8_xyz (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", p[0], p[1], p[2]);
@@ -5091,7 +5115,7 @@ unsigned int gx_tf_send_ni8s8_xyz (__u32 mem)
 
 unsigned int gx_tf_send_ni8s16_xyz (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]), BSWAPS16 (p[2]));
@@ -5104,7 +5128,7 @@ unsigned int gx_tf_send_ni8s16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_ni8f_xyz (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem) * CP_NORMAL_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]));
@@ -5117,7 +5141,7 @@ unsigned int gx_tf_send_ni8f_xyz (__u32 mem)
 
 unsigned int gx_tf_send_ni8s8_nbt (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", p[0], p[1], p[2]);
@@ -5132,7 +5156,7 @@ unsigned int gx_tf_send_ni8s8_nbt (__u32 mem)
 
 unsigned int gx_tf_send_ni8s16_nbt (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]), BSWAPS16 (p[2]));
@@ -5149,7 +5173,7 @@ unsigned int gx_tf_send_ni8s16_nbt (__u32 mem)
 
 unsigned int gx_tf_send_ni8f_nbt (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem) * CP_NORMAL_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]));
@@ -5166,9 +5190,9 @@ unsigned int gx_tf_send_ni8f_nbt (__u32 mem)
 
 unsigned int gx_tf_send_ni8s8_nbt3 (__u32 mem)
 {
-	__s8 *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
-	__s8 *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 1) * CP_NORMAL_ARRAY_STRIDE);
-	__s8 *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 1) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", n[0], n[1], n[2]);
@@ -5185,9 +5209,9 @@ unsigned int gx_tf_send_ni8s8_nbt3 (__u32 mem)
 
 unsigned int gx_tf_send_ni8s16_nbt3 (__u32 mem)
 {
-	__s16 *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
-	__s16 *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 1) * CP_NORMAL_ARRAY_STRIDE);
-	__s16 *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 1) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", BSWAPS16 (n[0]), BSWAPS16 (n[1]), BSWAPS16 (n[2]));
@@ -5204,9 +5228,9 @@ unsigned int gx_tf_send_ni8s16_nbt3 (__u32 mem)
 
 unsigned int gx_tf_send_ni8f_nbt3 (__u32 mem)
 {
-	float *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
-	float *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 1) * CP_NORMAL_ARRAY_STRIDE);
-	float *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEM (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
+	float *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
+	float *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 1) * CP_NORMAL_ARRAY_STRIDE);
+	float *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U8 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", BSWAPF (n[0]), BSWAPF (n[1]), BSWAPF (n[2]));
@@ -5224,7 +5248,7 @@ unsigned int gx_tf_send_ni8f_nbt3 (__u32 mem)
 // 16 bit indexed normal
 unsigned int gx_tf_send_ni16s8_xyz (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", p[0], p[1], p[2]);
@@ -5237,7 +5261,7 @@ unsigned int gx_tf_send_ni16s8_xyz (__u32 mem)
 
 unsigned int gx_tf_send_ni16s16_xyz (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]), BSWAPS16 (p[2]));
@@ -5250,7 +5274,7 @@ unsigned int gx_tf_send_ni16s16_xyz (__u32 mem)
 
 unsigned int gx_tf_send_ni16f_xyz (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem) * CP_NORMAL_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]));
@@ -5263,7 +5287,7 @@ unsigned int gx_tf_send_ni16f_xyz (__u32 mem)
 
 unsigned int gx_tf_send_ni16s8_nbt (__u32 mem)
 {
-	__s8 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", p[0], p[1], p[2]);
@@ -5278,7 +5302,7 @@ unsigned int gx_tf_send_ni16s8_nbt (__u32 mem)
 
 unsigned int gx_tf_send_ni16s16_nbt (__u32 mem)
 {
-	__s16 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", BSWAPS16 (p[0]), BSWAPS16 (p[1]), BSWAPS16 (p[2]));
@@ -5295,7 +5319,7 @@ unsigned int gx_tf_send_ni16s16_nbt (__u32 mem)
 
 unsigned int gx_tf_send_ni16f_nbt (__u32 mem)
 {
-	float *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem) * CP_NORMAL_ARRAY_STRIDE);
+	float *p = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", BSWAPF (p[0]), BSWAPF (p[1]), BSWAPF (p[2]));
@@ -5312,9 +5336,9 @@ unsigned int gx_tf_send_ni16f_nbt (__u32 mem)
 
 unsigned int gx_tf_send_ni16s8_nbt3 (__u32 mem)
 {
-	__s8 *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
-	__s8 *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
-	__s8 *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 4) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
+	__s8 *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 4) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", n[0], n[1], n[2]);
@@ -5331,9 +5355,9 @@ unsigned int gx_tf_send_ni16s8_nbt3 (__u32 mem)
 
 unsigned int gx_tf_send_ni16s16_nbt3 (__u32 mem)
 {
-	__s16 *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
-	__s16 *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
-	__s16 *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 4) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
+	__s16 *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 4) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%d, %d, %d)", BSWAPS16 (n[0]), BSWAPS16 (n[1]), BSWAPS16 (n[2]));
@@ -5350,9 +5374,9 @@ unsigned int gx_tf_send_ni16s16_nbt3 (__u32 mem)
 
 unsigned int gx_tf_send_ni16f_nbt3 (__u32 mem)
 {
-	float *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
-	float *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
-	float *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + MEMR16 (mem + 4) * CP_NORMAL_ARRAY_STRIDE);
+	float *n = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 0) * CP_NORMAL_ARRAY_STRIDE);
+	float *b = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 2) * CP_NORMAL_ARRAY_STRIDE);
+	float *t = MEM_ADDRESS (CP_NORMAL_ARRAY_BASE + FIFO_U16 (mem + 4) * CP_NORMAL_ARRAY_STRIDE);
 
 
 	DEBUG (EVENT_LOG_GX, "....  normal (%.2f, %.2f, %.2f)", BSWAPF (n[0]), BSWAPF (n[1]), BSWAPF (n[2]));
@@ -5539,29 +5563,69 @@ inline float vector_magnitude (float src[3])
 
 inline void vector_normalize (float dst[3], float src[3])
 {
-	float mag = vector_magnitude (src);
 
-
-	if (!FLOAT_EQ (mag, 0))
-		mag = 1.0 / mag;
-
-	vector_scale (dst, src, mag);
+	return vector_scale (dst, src, 1.0 / vector_magnitude (src));
 }
 
 
-inline void vector_normalize_fd (float dst[3], double src[3])
+float matrix9_det (float m[9])
 {
-	double mag = sqrt (src[0]*src[0] + src[1]*src[1] + src[2]*src[2]);
-	double t[3];
+	return (m[0] * (m[4] * m[8] - m[7] * m[5]) -
+					m[1] * (m[3] * m[8] - m[6] * m[5]) +
+					m[2] * (m[3] * m[7] - m[6] * m[4]));
+}
 
 
-	if (!FLOAT_EQ (mag, 0))
-		mag = 1.0 / mag;
+void matrix9_adj (float t[9], float m[9])
+{
+	t[0] =      (m[4]*m[8] - m[5]*m[7]);
+	t[1] = -1 * (m[1]*m[8] - m[2]*m[7]);
+	t[2] =      (m[1]*m[5] - m[2]*m[4]);
+	t[3] = -1 * (m[3]*m[8] - m[5]*m[6]);
+	t[4] =      (m[0]*m[8] - m[2]*m[6]);
+	t[5] = -1 * (m[0]*m[5] - m[2]*m[3]);
+	t[6] =      (m[3]*m[7] - m[4]*m[6]);
+	t[7] = -1 * (m[0]*m[7] - m[1]*m[6]);
+	t[8] =      (m[0]*m[4] - m[1]*m[3]);
+}
 
-	vector_scale_d (t, src, mag);
-	dst[0] = t[0];
-	dst[1] = t[1];
-	dst[2] = t[2];
+
+void matrix9_scale (float m[9], float s)
+{
+	int i;
+
+
+	for (i = 0; i < 9; i++)
+		m[i] *= s;
+}
+
+
+void matrix9_inv (float t[9], float m[9])
+{
+	float s = matrix9_det (m);
+
+
+	if (FLOAT_EQ (s, 0))
+		return;
+
+	matrix9_adj (t, m);
+	matrix9_scale (t, 1.0 / s);
+}
+
+
+void matrix9_mul_vec (float d[3], float m[9], float v[3])
+{
+	d[0] = m[0]*v[0] + m[1]*v[1] + m[2]*v[2];
+	d[1] = m[3]*v[0] + m[4]*v[1] + m[5]*v[2];
+	d[2] = m[6]*v[0] + m[7]*v[1] + m[8]*v[2];
+}
+
+
+void vec_mul_mat9 (float d[3], float v[3], float m[9])
+{
+	d[0] = m[0]*v[0] + m[3]*v[1] + m[6]*v[2];
+	d[1] = m[1]*v[0] + m[4]*v[1] + m[7]*v[2];
+	d[2] = m[2]*v[0] + m[5]*v[1] + m[8]*v[2];
 }
 
 
@@ -5596,9 +5660,9 @@ inline void color_u32_to_float (float dst[4], __u32 src)
 }
 
 
-float calc_light_intensity (GXLight *light, __u32 ctrl, float pos[3], float normal[3])
+float calc_light_intensity (GXLight *light, __u32 ctrl, float pos[3], float vN[3])
 {
-	float intensity = 1;
+	float atten, diffatten;
 
 
 	if (CHN_CTRL_ATTEN_ENABLE (ctrl))
@@ -5609,88 +5673,105 @@ float calc_light_intensity (GXLight *light, __u32 ctrl, float pos[3], float norm
 		if (CHN_CTRL_ATTEN_SELECT (ctrl))
 		{
 			// spotlight
-			float ldir[3];
+			float vL[3];
 
 
 			// vector from the light position to the vertex		
-			vector_sub (ldir, light->pos, pos);
+			vector_sub (vL, light->pos, pos);
 			// distance
-			d = vector_magnitude (ldir);
+			d = vector_magnitude (vL);
+			if (FLOAT_EQ (d, 0))
+				d = 0;
 			// normalize
-			vector_scale (ldir, ldir, 1/d);
+			vector_scale (vL, vL, 1.0/d);
 
 			// cosine of the angle between the light direction
 			// and the vector from the light position to the vertex
-			aattn = vector_dot_product (light->dir, ldir);
+			aattn = CLAMP0 (vector_dot_product (light->dir, vL));
 		}
 		else
 		{
+			float vL[3];
+
 			// specular
-			d = aattn = vector_dot_product (light->half_angle, normal);
+			vector_sub (vL, light->pos, pos);
+			if (vector_dot_product (vL, vN) > 0)
+				d = aattn = CLAMP0 (vector_dot_product (light->half_angle, vN));
+			else
+				d = aattn = 0;
 		}
 
 		// angular attenuation
-		spot = light->a[0] + light->a[1] * aattn + light->a[2] * aattn * aattn;
-		if (spot < 0)
-			spot = 0;
-
+		spot = CLAMP0 (light->a[0] + light->a[1] * aattn + light->a[2] * aattn * aattn);
 		// distance attenuation
-		dist = 1.0 / (light->k[0] + light->k[1] * d + light->k[2] * d * d);
-	
-		intensity = spot * dist;
+//		dist = 1.0 / (light->k[0] + light->k[1] * d + light->k[2] * d * d);
+		dist = (light->k[0] + light->k[1] * d + light->k[2] * d * d);
+		if (!FLOAT_EQ (dist, 0))
+			dist = 1.0 / dist;
+
+		atten = spot * dist;
 	}
 	else
+		atten = 1;
+
+	if (CHN_CTRL_DIFFUSE_ATTEN (ctrl) != 0)
 	{
-		float ldir[3];
+		float vL[3];
 
-		vector_sub (ldir, light->pos, pos);
-		vector_normalize (ldir, ldir);
-		intensity = vector_dot_product (ldir, normal);
+		vector_sub (vL, light->pos, pos);
+		vector_normalize (vL, vL);
+		diffatten = vector_dot_product (vL, vN);
+
+		// clamp
+		if (CHN_CTRL_DIFFUSE_ATTEN (ctrl) == 2)
+			diffatten = CLAMP0 (diffatten);
 	}
+	else
+		// df_none
+		diffatten = 1;
 
-	// clamp
-	if (CHN_CTRL_DIFFUSE_ATTEN (ctrl) == 2)
-		if (intensity < 0)
-			intensity = 0;
-
-	return intensity;
+	return atten * diffatten;
 }
 
 
-inline GXLight *xf_get_light (int i)
+// not working yet
+inline void calc_emboss (float t[3], GXTFVertex *vin, GXTFVertex *vout, int nl)
 {
-	return XF_LIGHT (i);
+	// double fake bump mapping
+	t[0] += 0.003;
+	t[1] += 0.003;
 }
 
 
 inline void calc_color (float outcolor[4], float incolor[4], int chn, float pos[3], float normal[3])
 {
-	float lightsum[4], lcolor[4], tcolor[4];
+	float illum[4], lcolor[4], mcolor[4];
 	__u32 lmask;
 	int l;
 
 
-	// select base color source
+	// select material color source
 	if (CHN_CTRL_USE_MAT0 (XF_COLOR_CTRL (chn)))
-		vector_copy (tcolor, material[chn]);
+		vector_copy (mcolor, material[chn]);
 	else if (chn < ncolors)
-		vector_copy (tcolor, incolor);
+		vector_copy (mcolor, incolor);
 	else
-		vector_set (tcolor, 1);
+		vector_set (mcolor, 1);
 
 	if (CHN_CTRL_USE_LIGHTING (XF_COLOR_CTRL (chn)))
 	{
 		// select ambient color source
 		if (CHN_CTRL_USE_AMB0 (XF_COLOR_CTRL (chn)))
-			vector_copy (lightsum, ambient[chn]);
+			vector_copy (illum, ambient[chn]);
 		else if (chn < ncolors)
-			vector_copy (lightsum, incolor);
+			vector_copy (illum, incolor);
 		else
-			vector_clear (lightsum);
+			vector_clear (illum);
 
 		lmask = CHN_CTRL_LIGHT_MASK (XF_COLOR_CTRL (chn));
 		l = 0;
 
+		// illum = clamp (amb + sum (lmask(i) * atten(i) * diffatten(i) * color))
 		// sum light intensity from all light sources
 		while (lmask)
 		{
@@ -5702,32 +5783,36 @@ inline void calc_color (float outcolor[4], float incolor[4], int chn, float pos[
 				vector_scale (lcolor, lcolor,
 						calc_light_intensity (XF_LIGHT (l), XF_COLOR_CTRL (chn), pos, normal));
 
-				vector_add (lightsum, lightsum, lcolor);
+				vector_add (illum, illum, lcolor);
 			}
 
 			l++;
 			lmask >>= 1;
 		}
+
+		illum[0] = CLAMP (illum[0], 0, 1);
+		illum[1] = CLAMP (illum[1], 0, 1);
+		illum[2] = CLAMP (illum[2], 0, 1);
 	}
 	else
-		vector_set (lightsum, 1);
+		vector_set (illum, 1);
 
 	// same for alpha
 	if (CHN_CTRL_USE_MAT0 (XF_ALPHA_CTRL (chn)))
-		tcolor[3] = material[chn][3];
+		mcolor[3] = material[chn][3];
 	else if (chn < ncolors)
-		tcolor[3] = incolor[3];
+		mcolor[3] = incolor[3];
 	else
-		tcolor[3] = 1;
+		mcolor[3] = 1;
 
 	if (CHN_CTRL_USE_LIGHTING (XF_ALPHA_CTRL (chn)))
 	{
 		if (CHN_CTRL_USE_AMB0 (XF_ALPHA_CTRL (chn)))
-			lightsum[3] = ambient[chn][3];
+			illum[3] = ambient[chn][3];
 		else if (chn < ncolors)
-			lightsum[3] = incolor[3];
+			illum[3] = incolor[3];
 		else
-			lightsum[3] = 0;
+			illum[3] = 0;
 
 		lmask = CHN_CTRL_LIGHT_MASK (XF_ALPHA_CTRL (chn));
 		l = 0;
@@ -5738,59 +5823,60 @@ inline void calc_color (float outcolor[4], float incolor[4], int chn, float pos[
 			{
 				color_u32_to_float (lcolor, XF_LIGHT (l)->color);
 
-				lightsum[3] += lcolor[3] *
+				illum[3] += lcolor[3] *
 						calc_light_intensity (XF_LIGHT (l), XF_COLOR_CTRL (chn), pos, normal);
 			}
 
 			l++;
 			lmask >>= 1;
 		}
+
+		illum[3] = CLAMP (illum[3], 0, 1);
 	}
 	else
-		lightsum[3] = 1;
+		illum[3] = 1;
 
-	outcolor[0] = CLAMP (tcolor[0] * lightsum[0], 0, 1);
-	outcolor[1] = CLAMP (tcolor[1] * lightsum[1], 0, 1);
-	outcolor[2] = CLAMP (tcolor[2] * lightsum[2], 0, 1);
-	outcolor[3] = CLAMP (tcolor[3] * lightsum[3], 0, 1);
+	outcolor[0] = mcolor[0] * illum[0];
+	outcolor[1] = mcolor[1] * illum[1];
+	outcolor[2] = mcolor[2] * illum[2];
+	outcolor[3] = mcolor[3] * illum[3];
 }
 
 
-// incorrect, only few effects work right
-void tex_gen (GXTFVertex *v, int s, float pos[3])
+void tex_gen (GXTFVertex *vout, GXTFVertex *vin, int n)
 {
-	int n = TS_TEXCOORD (s);
 	int row = TC_SOURCE_ROW (n);
 	float t[3], out[3];
 
 
 	switch (row)
 	{
-		case INROW_GEOM:
-			vector_copy (t, pos);
-			break;
-
-		case INROW_NORMAL:
-			vector_copy (t, cv->normal[0]);
-			break;
-
 		case INROW_COLORS:
 			// used with color texgen
 			break;
 
-		case INROW_BINORMAL_T:
-			vector_copy (t, cv->normal[2]);
+		case INROW_GEOM:
+			vector_copy (t, vin->pos);
+			break;
+
+		case INROW_NORMAL:
+			vector_copy (t, vin->normal[0]);
 			break;
 
 		case INROW_BINORMAL_B:
-			vector_copy (t, cv->normal[1]);
+			vector_copy (t, vin->normal[1]);
 			break;
+
+		case INROW_BINORMAL_T:
+			vector_copy (t, vin->normal[2]);
+			break;
+
 
 		// TEX0 - TEX7
 		default:
 			if (row - INROW_TEX0 < ntextures)
 			{
-				vector2_copy (t, v->tex[row - INROW_TEX0]);
+				vector2_copy (t, vin->tex[row - INROW_TEX0]);
 				t[2] = 1;
 			}
 	}
@@ -5803,24 +5889,25 @@ void tex_gen (GXTFVertex *v, int s, float pos[3])
 				transform_texcoord_stq (out, t, tex_matrix_index[n]);
 			else
 			// st
-			{
-				transform_texcoord_st (out, t, tex_matrix_index[n]);
-				out[2] = 1;
-			}
+				transform_texcoord_2x4 (out, t, tex_matrix_index[n]);
 			break;
 
 		case TEXGEN_EMBOSS_MAP:
+			vector_copy (out, vout->tex[TC_EMBOSS_SOURCE (n)]);
+			calc_emboss (out, vin, vout, TC_EMBOSS_LIGHT (n));
+			vector_copy (vout->tex[n], out);
+			return;
 			break;
 		
 		case TEXGEN_COLOR_STRGBC0:
-			out[0] = cv->color[0][0];
-			out[1] = cv->color[0][1];
+			out[0] = vout->color[0][0];
+			out[1] = vout->color[0][1];
 			out[2] = 1.0;
 			break;
 
 		case TEXGEN_COLOR_STRGBC1:
-			out[0] = cv->color[1][0];
-			out[1] = cv->color[1][1];
+			out[0] = vout->color[1][0];
+			out[1] = vout->color[1][1];
 			out[2] = 1.0;
 			break;
 	}
@@ -5828,75 +5915,120 @@ void tex_gen (GXTFVertex *v, int s, float pos[3])
 	if (TC_NORMALIZE (n))
 		vector_normalize (out, out);
 
-	transform_texcoord_stq_dual (v->tex[s], out, TC_DUALMTX (n));
+	transform_texcoord_stq_dual (vout->tex[n], out, TC_DUALMTX (n));
+}
 
-	// divide by q
-	v->tex[s][0] /= v->tex[s][2];
-	v->tex[s][1] /= v->tex[s][2];
+
+void tf_normal (GXTFVertex *out, GXTFVertex *in, int n)
+{
+	// dequantize (unnecessary?)
+	vector_scale (in->normal[n], in->normal[n], ndq);
+	transform_normal (out->normal[n], in->normal[n], pn_matrix_index);
+	vector_normalize (out->normal[n], out->normal[n]);
+}
+
+
+void tf_pos (GXTFVertex *out, GXTFVertex *in)
+{
+	// dequantize
+	vector_scale (in->pos, in->pos, vdq);
+	transform_position_xyz (out->pos, in->pos, pn_matrix_index);
+}
+
+
+void gx_transform_vertex (GXTFVertex *out, GXTFVertex *in)
+{
+	int i;
+
+
+	tf_pos (out, in);
+
+	if (HOST_NORMALS)
+	{
+		tf_normal (out, in, 0);
+		if (HOST_NORMALS > 1)
+		{
+			tf_normal (out, in, 1);
+			tf_normal (out, in, 2);
+		}
+	}
+
+	// calculate colors
+	for (i = 0; i < XF_COLORS; i++)
+		calc_color (out->color[i], in->color[i], i, out->pos, out->normal[0]);
+
+	// calculate texture coordinates
+	for (i = 0; i < XF_TEXTURES; i++)
+	{
+		vector2_scale (in->tex[i], in->tex[i], tdq[i]);
+		tex_gen (out, in, i);
+	}
 }
 
 
 // ignore vertex if index is max (0xff for 8bit index, 0xffff for 16bit index)
 void gx_send_current_vertex (void)
 {
-	float tpos[3], t[3];
+	GXTFVertex *out = &tvarray[cvertex];
+	int i;
 
 
-	// dequantize
-	vector_scale (tpos, cv->pos, vdq);
-	transform_position_xyz (cv->pos, tpos, pn_matrix_index);
+	gx_transform_vertex (out, cv);
 
-	if (HOST_NORMALS)
+	for (i = 0; i < XF_TEXTURES; i++)		
+		glMultiTexCoord4fARB (GL_TEXTURE0_ARB+i, out->tex[i][0] * TEX_SSIZE (i), out->tex[i][1] * TEX_TSIZE (i), 0, out->tex[i][2]);
+
+	if (!(gxswitches.tex_transparent + gxswitches.sw_fullbright))
 	{
-	// dequantize
-//		vector_scale (t, cv->normal[0], ndq);
-		transform_normal (t, cv->normal[0], pn_matrix_index);
-		vector_normalize (cv->normal[0], t);
-	}
-
-	if (XF_COLORS)
-	{
-		// calculate color
-		calc_color (cv->color[0], cv->color[0], 0, cv->pos, cv->normal[0]);
-
-		if (XF_COLORS == 2)
+		if (XF_COLORS)
 		{
-			calc_color (cv->color[1], cv->color[1], 1, cv->pos, cv->normal[0]);
-#if 0
-			// specular only
-			vector_copy (cv->color[0], cv->color[1]);
-#else
-			// diffuse + specular
-			vector_add (cv->color[0], cv->color[0], cv->color[1]);
-#endif
+			glColor4fv (out->color[0]);
+
+			if (XF_COLORS > 1)
+				glVertexAttrib4fvARB (COLOR1_ATTR_NUM, out->color[1]);
 		}
 	}
 
-	if (XF_TEXTURES)
-	{
-		// calculate texture coordinates
-		vector2_scale (cv->tex[0], cv->tex[0], tdq[0]);
-		tex_gen (cv, 0, tpos);
-	}
-
-	if (XF_TEXTURES)
-		glTexCoord2fv (cv->tex[0]);
-
-	if (XF_COLORS && !(gxswitches.wireframe + gxswitches.tex_transparent + gxswitches.sw_fullbright))
-		glColor4fv (cv->color[0]);
-
-	glVertex3fv (cv->pos);
+	glVertex3fv (out->pos);
 }
 
 
-#define DO_TRANSFORM 1
+void gx_send_current_vertex_wireframe (void)
+{
+	GXTFVertex *out = &tvarray[cvertex];
+
+
+	tf_pos (out, cv);
+	glVertex3fv (out->pos);
+}
+
+
+void gx_prepare_texture (int n)
+{
+	gx_load_texture (n);
+
+	if (texactive[n])
+	{
+		DEBUG (EVENT_LOG_GX, "....  TEXTURE%d %.8x %dx%d", n,
+					 texactive[n]->address, texactive[n]->width, texactive[n]->height);
+
+		cg_params_set_tus (n, texactive[n]->width, texactive[n]->height);
+
+		glMatrixMode (GL_TEXTURE);
+		glLoadIdentity ();
+	}
+	else
+		gx_enable_texture (n, 0);
+}
+
+
 unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 {
 	unsigned int (*midx[16]) (__u32 mem);
 	unsigned int (*vdata[16]) (__u32 mem);
 	unsigned int (*pos) (__u32 mem);
 	int nm = 0, nv = 0, psize, i, j;
-	__u32 start = mem, mp = mem, list_size = 0, color;
+	__u32 start = mem, mp = mem, list_size = 0;
 
 
 	if (!n)
@@ -5910,7 +6042,6 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 
 		if (VCD_T0MIDX)
 			midx[nm++] = gx_send_t0midx;
-
 		if (VCD_T1MIDX)
 			midx[nm++] = gx_send_t1midx;
 		if (VCD_T2MIDX)
@@ -5981,12 +6112,7 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 		return list_size * n;
 	}
 
-	// normal (faked)
-#if DO_TRANSFORM
 	vdata[nv] = gxnormal_tf[GXIDX (NORMAL, vat)];
-#else
-	vdata[nv] = gxnormal[GXIDX (NORMAL, vat)];
-#endif
 	if (vdata[nv])
 	{
 		nv++;
@@ -6023,11 +6149,7 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 		ncolors = 0;
 
 		// color 0
-#if DO_TRANSFORM
 		vdata[nv] = gxcol0_tf[GXIDX (COL0, vat)];
-#else
-		vdata[nv] = gxcol[GXIDX (COL0, vat)];
-#endif
 		if (vdata[nv])
 		{
 			nv++;
@@ -6035,11 +6157,7 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 		}
 
 		// color 1
-#if DO_TRANSFORM
 		vdata[nv] = gxcol1_tf[GXIDX (COL1, vat)];
-#else
-		vdata[nv] = gxcol_fake[GXIDX (COL1, vat)];
-#endif
 		if (vdata[nv])
 		{
 			nv++;
@@ -6048,11 +6166,7 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 	}
 
 	ntextures = 0;
-#if DO_TRANSFORM
 	if (HOST_TEXTURES || XF_TEXTURES)
-#else
-	if (HOST_TEXTURES)
-#endif
 	{
 		if (gxswitches.wireframe)
 		{
@@ -6060,167 +6174,165 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 			vdata[nv] = gxtex_fake[GXIDX (TEX0, vat)];
 			if (vdata[nv])
 				nv++;
+
+			gx_enable_texture (0, 0);
+
+			// texture 1
+			vdata[nv] = gxtex_fake[GXIDX (TEX1, vat)];
+			if (vdata[nv])
+				nv++;
+
+			gx_enable_texture (1, 0);
+
+			// texture 2
+			vdata[nv] = gxtex_fake[GXIDX (TEX2, vat)];
+			if (vdata[nv])
+				nv++;
+
+			gx_enable_texture (2, 0);
+
+			// texture 3
+			vdata[nv] = gxtex_fake[GXIDX (TEX3, vat)];
+			if (vdata[nv])
+				nv++;
+
+			gx_enable_texture (3, 0);
+
+			// texture 4
+			vdata[nv] = gxtex_fake[GXIDX (TEX4, vat)];
+			if (vdata[nv])
+				nv++;
+
+			gx_enable_texture (4, 0);
+
+			// texture 5
+			vdata[nv] = gxtex_fake[GXIDX (TEX5, vat)];
+			if (vdata[nv])
+				nv++;
+
+			gx_enable_texture (5, 0);
+
+			// texture 6
+			vdata[nv] = gxtex_fake[GXIDX (TEX6, vat)];
+			if (vdata[nv])
+				nv++;
+
+			gx_enable_texture (6, 0);
+
+			// texture 7
+			vdata[nv] = gxtex_fake[GXIDX (TEX7, vat)];
+			if (vdata[nv])
+				nv++;
+
+			gx_enable_texture (7, 0);
 		}
 		else
 		{
 			// texture 0
-#if DO_TRANSFORM
-				vdata[nv] = gxtex_tf[GXIDX (TEX0, vat)];
-#else
-			if (VCD_T0MIDX)
-				vdata[nv] = gxtex_midx[GXIDX (TEX0, vat)];
-			else
-				vdata[nv] = gxtex[GXIDX (TEX0, vat)];
-#endif
+			vdata[nv] = gxtex_tf[GXIDX (TEX0, vat)];
 			if (vdata[nv])
 			{
 				nv++;
 				ntextures++;
 			}
-		}
 
-		// other textures are faked
-		// texture 1
-		vdata[nv] = gxtex_fake[GXIDX (TEX1, vat)];
-		if (vdata[nv])
-			nv++;
-
-		// texture 2
-		vdata[nv] = gxtex_fake[GXIDX (TEX2, vat)];
-		if (vdata[nv])
-			nv++;
-
-		// texture 3
-		vdata[nv] = gxtex_fake[GXIDX (TEX3, vat)];
-		if (vdata[nv])
-			nv++;
-
-		// texture 4
-		vdata[nv] = gxtex_fake[GXIDX (TEX4, vat)];
-		if (vdata[nv])
-			nv++;
-
-		// texture 5
-		vdata[nv] = gxtex_fake[GXIDX (TEX5, vat)];
-		if (vdata[nv])
-			nv++;
-
-		// texture 6
-		vdata[nv] = gxtex_fake[GXIDX (TEX6, vat)];
-		if (vdata[nv])
-			nv++;
-
-		// texture 7
-		vdata[nv] = gxtex_fake[GXIDX (TEX7, vat)];
-		if (vdata[nv])
-			nv++;
-
-		if (gxswitches.wireframe)
-			gx_enable_texture (0, 0);
-		else
-		{
-			gx_load_texture (0);
-		}
-
-		if (texactive[0])
-		{
-			DEBUG (EVENT_LOG_GX, "....  TEXTURE %.8x %dx%d",
-						 texactive[0]->address, texactive[0]->width, texactive[0]->height);
-
-			glMatrixMode (GL_TEXTURE);
-	
-			// dequantize
+			gx_prepare_texture (0);
 			tdq[0] = 1.0 / (1 << VAT_TEX0_SHFT (vat));
-#if !DO_TRANSFORM
-			if (VCD_T0MIDX)
-			{
-				glLoadIdentity ();
-				if (!texactive[0]->p2)
-					glScalef (TEX_SSIZE (0), TEX_TSIZE (0), 1);
-			}
-			else
-			{
-				gx_load_texture_matrix (MIDX_TEX0, texactive[0]->p2);
 
-				if (texactive[0]->p2)
-					glScalef (tdq[0], tdq[0], tdq[0]);
-				else
-					glScalef (tdq[0] * TEX_SSIZE (0), tdq[0] * TEX_TSIZE (0), tdq[0]);
+			// texture 1
+			vdata[nv] = gxtex_tf[GXIDX (TEX1, vat)];
+			if (vdata[nv])
+			{
+				nv++;
+				ntextures++;
 			}
 
-			if (texactive[0] == &tag_render_target)
+			gx_prepare_texture (1);
+			tdq[1] = 1.0 / (1 << VAT_TEX1_SHFT (vat));
+
+			// texture 2
+			vdata[nv] = gxtex_tf[GXIDX (TEX2, vat)];
+			if (vdata[nv])
 			{
-				// need to flip the render target
-				if (tag_render_target.xfb_mipmap)
-				{
-					glTranslatef (0.5 / tdq[0] , 0.5 / tdq[0], 0);
-					glScalef (2, -2, 1);
-					glTranslatef (-0.5 * 0.5 / tdq[0] , -0.5 * 1.5 / tdq[0], 0);
-				}
-				else
-				{
-					glTranslatef (0.5 / tdq[0] , 0.5 / tdq[0], 0);
-					glScalef (1, -1, 1);
-					glTranslatef (-0.5 / tdq[0] , -0.5 / tdq[0], 0);
-				}
+				nv++;
+				ntextures++;
 			}
-#else
-			glLoadIdentity ();
 
-			if (!texactive[0]->p2)
-				glScalef (TEX_SSIZE (0), TEX_TSIZE (0), 1);
+			gx_prepare_texture (2);
+			tdq[2] = 1.0 / (1 << VAT_TEX2_SHFT (vat));
 
-			if (texactive[0] == &tag_render_target)
+			// texture 3
+			vdata[nv] = gxtex_tf[GXIDX (TEX3, vat)];
+			if (vdata[nv])
 			{
-				// need to flip the render target
-				if (tag_render_target.xfb_mipmap)
-				{
-					glTranslatef (0.5 , 0.5, 0);
-					glScalef (2, -2, 1);
-					glTranslatef (-0.5 * 0.5 , -0.5 * 1.5, 0);
-				}
-				else
-				{
-					glTranslatef (0.5 , 0.5, 0);
-					glScalef (1, -1, 1);
-					glTranslatef (-0.5 , -0.5, 0);
-				}
+				nv++;
+				ntextures++;
 			}
-#endif
 
-			glMatrixMode (GL_MODELVIEW);
+			gx_prepare_texture (3);
+			tdq[3] = 1.0 / (1 << VAT_TEX3_SHFT (vat));
+
+			// texture 4
+			vdata[nv] = gxtex_tf[GXIDX (TEX4, vat)];
+			if (vdata[nv])
+			{
+				nv++;
+				ntextures++;
+			}
+
+			gx_prepare_texture (4);
+			tdq[4] = 1.0 / (1 << VAT_TEX4_SHFT (vat));
+
+			// texture 5
+			vdata[nv] = gxtex_tf[GXIDX (TEX5, vat)];
+			if (vdata[nv])
+			{
+				nv++;
+				ntextures++;
+			}
+
+			gx_prepare_texture (5);
+			tdq[5] = 1.0 / (1 << VAT_TEX5_SHFT (vat));
+
+			// texture 6
+			vdata[nv] = gxtex_tf[GXIDX (TEX6, vat)];
+			if (vdata[nv])
+			{
+				nv++;
+				ntextures++;
+			}
+
+			gx_prepare_texture (6);
+			tdq[6] = 1.0 / (1 << VAT_TEX6_SHFT (vat));
+
+			// texture 7
+			vdata[nv] = gxtex_tf[GXIDX (TEX7, vat)];
+			if (vdata[nv])
+			{
+				nv++;
+				ntextures++;
+			}
+
+			gx_prepare_texture (7);
+			tdq[7] = 1.0 / (1 << VAT_TEX7_SHFT (vat));
 		}
-		else
-			gx_enable_texture (0, 0);
+
+		glMatrixMode (GL_MODELVIEW);
 	}
 	else if (texactive[0])
-		gx_enable_texture (0, 0);
+	{
+		for (i = 0; i < 8; i++)
+			gx_enable_texture (i, 0);
+	}
 
 	// position
 	i = GXIDX (POS, vat);
 	psize = gxpos_size[i];
-#if DO_TRANSFORM
 	pos = gxpos_tf[i];
-#else
-	pos = gxpos[i];
-#endif
 
 	// load geometry matrix
 	vdq = 1.0 / (1 << VAT_POS_SHFT (vat));
-#if !DO_TRANSFORM
-	if (VCD_PMIDX)
-	{
-		pos = gxpos_midx[GXIDX (POS, vat)];
-		glLoadIdentity ();
-	}
-	else
-	{
-		gx_load_geometry_matrix (MIDX_GEO);
-		glScalef (vdq, vdq, vdq);
-	}
-#else
 	glLoadIdentity ();
-#endif
 
 	if (gxswitches.wireframe)
 		glColor4f (0, 0, 0, 1);
@@ -6232,24 +6344,29 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 			glColor4f (1, 1, 1, 1);
 		else
 		{
+/*
 			if (XF_COLORS)
 			{
-				color = BSWAP32 (XF_MATERIAL0);
+				__u32 color = BSWAP32 (XF_MATERIAL0);
 
-				if (XF (0x100e) & 1)
+				// color 0 material src -> 1 means CP supplied Vertex color
+				if (XF_COLOR_CTRL (0) & 1)
 					color |= 0xffffff00;
 			
-				if (XF (0x1010) & 1)
+				// color 0 alpha material src
+				if (XF_ALPHA_CTRL (0) & 1)
 					color |= 0xff;
 
 				glColor4ubv ((unsigned char *) &color);
 			}
 			else	
 				glColor4f (1, 1, 1, 1);
+*/
+			if (!XF_COLORS)
+				glColor4f (1, 1, 1, 1);
 		}
 	}
 
-#if DO_TRANSFORM
 	cvertex = 0;
 	cv = varray;
 
@@ -6260,10 +6377,18 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 
 	pn_matrix_index = MIDX_GEO;
 	tex_matrix_index[0] = MIDX_TEX0;
-	
-	if (!XF_COLORS)
-		glColor4f (1, 1, 1, 1);
-#endif
+	tex_matrix_index[1] = MIDX_TEX1;
+	tex_matrix_index[2] = MIDX_TEX2;
+	tex_matrix_index[3] = MIDX_TEX3;
+	tex_matrix_index[4] = MIDX_TEX4;
+	tex_matrix_index[5] = MIDX_TEX5;
+	tex_matrix_index[6] = MIDX_TEX6;
+	tex_matrix_index[7] = MIDX_TEX7;
+
+	if (!gxswitches.wireframe)
+		cg_bind_program_f (cg_get_program_f ());
+	else
+		cg_unbind_f ();
 
 	glBegin (prim);
 
@@ -6283,11 +6408,13 @@ unsigned int gx_draw_new (__u32 mem, int prim, int n, int vat)
 
 			// position
 			pos (mp);
-#if DO_TRANSFORM			
+
 			// transform and send
-			gx_send_current_vertex ();
+			if (gxswitches.wireframe)
+				gx_send_current_vertex_wireframe ();
+			else
+				gx_send_current_vertex ();
 			cv = &varray[++cvertex];
-#endif
 		}
 
 	glEnd ();

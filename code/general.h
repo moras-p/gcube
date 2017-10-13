@@ -47,11 +47,23 @@
 
 #define MIN(a,b)					(((a) < (b)) ? (a) : (b))
 #define CLAMP(X,min,max)	(((X) > max) ? max : (((X) < min) ? min : (X)))
-#define EPSI							0.0001
+#define CLAMP0(X)					(((X) > 0) ? (X) : 0)
+#define EPSI							0.0000000000001
 #define ABS(X)						(((X) > 0) ? (X) : -(X))
 #define FLOAT_EQ(a,b)			(ABS ((a) - (b)) < EPSI)
+#define FLOAT_S11(X)			(EXTS (11, X) / 1024.0)
 
 #define CRC_POLY		0xA0000001
+
+
+#define MAGICNUM_SAFE				1
+#define MAX_RMAGIC 64
+typedef struct
+{
+	__u32 xmagic;
+	__u32 rmagic[MAX_RMAGIC];
+	int n, nbits;
+} MagicNum;
 
 
 static inline int CALC_OVERFLOW (__s32 a, __s32 b)
@@ -95,6 +107,14 @@ void create_dir (char *name);
 void create_dir_tree (char *parent);
 
 int path_writeable (char *path);
+
+void magic_num_reset (MagicNum *m);
+void magic_num_cpy (MagicNum *dest, MagicNum *src);
+void magic_num_acc (MagicNum *m, unsigned int value, unsigned int bits);
+int magic_num_eq (MagicNum *a, MagicNum *b);
+__u32 magic_num_xmagic (MagicNum *m);
+
+char *f2str (const char *filename);
 
 
 #endif // __GENERAL_H

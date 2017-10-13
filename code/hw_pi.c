@@ -117,7 +117,7 @@ void pi_interrupt (__u32 mask, int set)
 {
 	if (set && (mask == INTERRUPT_DI))
 	{
-		delayed_interrupt_set (2, 2000);
+		delayed_interrupt_set (2, 6000);
 		return;
 	}
 
@@ -132,6 +132,7 @@ void pi_interrupt (__u32 mask, int set)
 
 void pi_interrupt_ex (__u32 mask, int set)
 {
+/*
 	if (set)
 	{
 		if (!(INTSR & mask))
@@ -142,6 +143,7 @@ void pi_interrupt_ex (__u32 mask, int set)
 		if (INTSR & mask)
 			printf ("ex interrupt cleared: %.8x\n", mask);
 	}
+*/
 
 	if (set)
 		INTSR |= mask;

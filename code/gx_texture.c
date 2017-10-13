@@ -22,20 +22,36 @@
  *         
  */
 
-#include "hw_gx.h"
 #include <SDL/SDL_opengl.h>
-
+#include "hw_gx.h"
 #include "gl_ext.h"
 
+// if set, one texture can use only one tlut at a time
+// correct in Warioware Inc (otherwise needs reloading textures after minigame starts)
+// incorrect (and painfully slow) in Final Fantasy Crystal Chronicles
+#define IT_ONE_TLUT				0
+
+#define DUMP_RT						0
+
 TextureCache texcache;
+TextureCache texcache_rt;
 TextureTag *texactive[8] = {0};
 int texenabled[8];
 
-TextureTag tag_render_target;
+#define MAX_RT_TYPES					2
+TextureTag tag_render_target[MAX_RT_TYPES];
+
+
+RTTex rt_tex[] =
+{
+	{ GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE, 4, },
+	{ GL_DEPTH_COMPONENT16, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, 2, },
+};
 
 
 // for texture conversion
 __u8 texbuff[1024*1024*4];
+__u8 texbuff2[1024*1024*4];
 
 
 #define TEX_I4_TILE_WIDTH				8
@@ -143,7 +159,8 @@ void gx_convert_texture_i8_rgba (__u8 *src, int width, int height, __u16 *tlut, 
 
 				for (l = 0; l < maxl; l++)
 				{
-					dst[ofs + l] = color_unpack_i8 (*src) | MASK_ALPHA;
+//					dst[ofs + l] = color_unpack_i8 (*src) | MASK_ALPHA;
+					dst[ofs + l] = color_unpack_i8 (*src);
 					src++;
 				}
 
@@ -992,9 +1009,29 @@ void texcache_tlut_reload (__u32 tlut_address)
 }
 
 
+int tex_in_texcache (__u32 address)
+{
+	return (MEM32 (address) == TEXCACHE_MAGIC);
+}
+
+
+void tex_invalidate (__u32 address)
+{
+	int i;
+
+
+	for (i = 0; i < texcache.ntags; i++)
+		if (texcache.tags[i].address == address)
+		{
+			texcache_tag_invalidate (&texcache.tags[i]);
+			return;
+		}
+}
+
+
 int texcache_tag_valid (TextureTag *tag)
 {
-	return (MEM32 (tag->marker_address) == TEXCACHE_MAGIC);
+	return tex_in_texcache (tag->marker_address);
 }
 
 
@@ -1130,14 +1167,18 @@ TextureTag *texcache_add_tag (__u32 address, __u32 tlut_address,
 }
 
 
-TextureTag *texcache_fetch (__u32 address, int width, int height)
+TextureTag *texcache_fetch (__u32 address, __u32 tlut_address, int width, int height)
 {
 	int i;
 
 
 	for (i = 0; i < texcache.ntags; i++)
 	{
-		if (texcache.tags[i].address == address)
+		if ((texcache.tags[i].address == address)
+#if !IT_ONE_TLUT
+				&& (texcache.tags[i].tlut_address == tlut_address)
+#endif
+				)
 		{
 			if ((texcache.tags[i].width == width) && (texcache.tags[i].height == height))
 			{
@@ -1165,6 +1206,100 @@ TextureTag *texcache_fetch (__u32 address, int width, int height)
 }
 
 
+TextureTag *texcache_rt_add_tag (__u32 address, unsigned int tex,
+															int width, int height,
+															int type, int informat, int format)
+{
+	texcache_rt.tags[texcache_rt.ntags].address = address;
+	texcache_rt.tags[texcache_rt.ntags].tex = tex;
+	texcache_rt.tags[texcache_rt.ntags].width = width;
+	texcache_rt.tags[texcache_rt.ntags].height = height;
+
+	texcache_rt.tags[texcache_rt.ntags].type = type;
+	texcache_rt.tags[texcache_rt.ntags].format = format;
+	texcache_rt.tags[texcache_rt.ntags].informat = informat;
+	
+	MEM32 (address) = XFB_MAGIC (0);
+
+	if (type == GL_TEXTURE_2D)
+		texcache_rt.tags[texcache_rt.ntags].p2 = TRUE;
+	else
+		texcache_rt.tags[texcache_rt.ntags].p2 = FALSE;
+
+	texcache_rt.tags[texcache_rt.ntags].misses = 0;
+
+	return &texcache_rt.tags[texcache_rt.ntags++];
+}
+
+
+void texcache_rt_remove_tag (TextureTag *tag)
+{
+	glDeleteTextures (1, &tag->tex);
+
+	// copy last cache entry overwriting this one
+	if (tag != &texcache_rt.tags[texcache_rt.ntags - 1])
+		memcpy (tag, &texcache_rt.tags[texcache_rt.ntags - 1], sizeof (TextureTag));
+
+	texcache_rt.ntags--;
+}
+
+
+void texcache_rt_remove_all (void)
+{
+	while (texcache_rt.ntags)
+		texcache_rt_remove_tag (&texcache_rt.tags[texcache_rt.ntags - 1]);
+}
+
+
+TextureTag *texcache_rt_fetch (__u32 address, __u32 width, __u32 height)
+{
+	int i;
+
+
+	for (i = 0; i < texcache_rt.ntags; i++)
+	{
+		if ((texcache_rt.tags[i].address == address) &&
+				(texcache_rt.tags[i].width == width) &&
+				(texcache_rt.tags[i].height == height))
+			return &texcache_rt.tags[i];
+		else
+			texcache_rt.tags[i].misses++;
+	}
+
+	return NULL;
+}
+
+
+int gx_render_target_num (__u32 address)
+{
+	__u32 n = MEM32 (address) - XFB_MAGIC (0);
+	
+
+	return (n < MAX_RT_TYPES) ? n : -1;
+}
+
+
+int tex_is_rt (__u32 address)
+{
+	return (MEM32 (address) == XFB_MAGIC (0));
+}
+
+
+TextureTag *gx_get_render_target (__u32 address, __u32 width, __u32 height)
+{
+	return texcache_rt_fetch (address, width, height);
+}
+
+
+inline int gx_is_tex_p2 (int n)
+{
+	if (texactive[n])
+		return texactive[n]->p2;
+	else
+		return FALSE;
+}
+
+
 // this function is way too long. divide it into smaller ones.
 void gx_load_texture (unsigned int index)
 {
@@ -1182,11 +1317,20 @@ void gx_load_texture (unsigned int index)
 	int i;
 
 
+	if (!address)
+		return;
+
+	if (!texconvert[format])
+	{
+		texactive[index] = NULL;
+		DEBUG (EVENT_LOG_GX, "....  TEX couldn't convert texture %.8x", address);
+		return;
+	}
+
 	// non power of two textures should only be able to use GX_WRAP
 	// but it seems it is not so (Paper Mario RPG)
 	if ((TEX_MODE_WRAP_S (index) != 0) || (TEX_MODE_WRAP_T (index) != 0))
 	{
-		DEBUG (EVENT_LOG_GX, "....  NP2 texture uses invalid wrap mode!");
 		// only possible with p2 textures
 		// enlarge the texture. there will be trash on new textures.
 		// hopefully, it won't be displayed
@@ -1197,20 +1341,22 @@ void gx_load_texture (unsigned int index)
 			height = closest_upper_power_of_two (height);
 	}
 
-	if (MEM32 (address) == XFB_MAGIC)
+
+	if (tex_is_rt (address))
 	{
-#if 1
-		gx_enable_texture (index, tag_render_target.type);
-		gx_bind_texture (index, &tag_render_target);
-#else
-		// don't use render target
-		gx_enable_texture (index, 0);
-		gx_bind_texture (index, NULL);
-#endif
+		tag = gx_get_render_target (address, width, height);
+		if (tag)
+		{
+			gx_enable_texture (index, tag->type);
+			gx_bind_texture (index, tag);
+		}
+		else
+			gx_enable_texture (index, 0);
+
 		return;
 	}
 
-	tag = texcache_fetch (address, width, height);
+	tag = texcache_fetch (address, tlut_address, width, height);
 
 	// mipmap flag might have changed since last load
 	if (tag && !tag->mipmaps_loaded && TEX_IS_MIPMAPPED (index))
@@ -1221,12 +1367,14 @@ void gx_load_texture (unsigned int index)
 
 	if (tag)
 	{
+#if IT_ONE_TLUT
 		if (tag->tlut_address != tlut_address)
 		{
 			tag->reload = TRUE;
 			tag->tlut_address = tlut_address;
 		}
-	
+#endif
+
 		gx_enable_texture (index, tag->type);
 		if (tag != texactive[index])
 			gx_bind_texture (index, tag);
@@ -1291,13 +1439,6 @@ void gx_load_texture (unsigned int index)
 		return;
 	}
 
-	if (!texconvert[format] || !address)
-	{
-		texactive[index] = NULL;
-		DEBUG (EVENT_LOG_GX, "....  TEX couldn't convert texture %.8x", address);
-		return;
-	}
-
 	DEBUG (EVENT_LOG_GX, "....  load tex from %.8x W %d H %d F %d tlut %.8x F %d",
 				 address | 0x80000000, width, height, format, tlut_address, tlut_format);
 
@@ -1305,6 +1446,13 @@ void gx_load_texture (unsigned int index)
 		type = GL_TEXTURE_2D;
 	else
 		type = GL_TEXTURE_RECTANGLE;
+
+#if !IT_ONE_TLUT
+	// if one texture is used with more than one tlut, this texture
+	// might already be in texcache
+	if (tex_in_texcache (address))
+		tex_invalidate (address);
+#endif
 
 	// convert base image
 	texconvert[format] (MEM_ADDRESS (address),
@@ -1370,42 +1518,83 @@ void gx_load_texture (unsigned int index)
 }
 
 
-
-void gx_create_render_target (void)
+TextureTag *gx_create_render_target (__u32 address, int width, int height, int type)
 {
-	memset (&tag_render_target, 0, sizeof (tag_render_target));
+	unsigned int tex;
+	int target;
 
-	glGenTextures (1, &tag_render_target.tex);
-	glBindTexture (GL_TEXTURE_RECTANGLE, tag_render_target.tex);
-	glTexParameteri (GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri (GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	glTexImage2D (GL_TEXTURE_RECTANGLE, 0, GL_RGBA, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	if (is_power_of_two (width) && is_power_of_two (height))
+		target = GL_TEXTURE_2D;
+	else
+		target = GL_TEXTURE_RECTANGLE;
 
-	tag_render_target.type = GL_TEXTURE_RECTANGLE;
-	tag_render_target.width = screen_width;
-	tag_render_target.height = screen_height;
-	tag_render_target.p2 = FALSE;
+	glGenTextures (1, &tex);
+	glBindTexture (target, tex);
+	glTexParameteri (target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri (target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glTexImage2D (target, 0, rt_tex[type].informat,
+								width, height, 0, rt_tex[type].format, rt_tex[type].type, NULL);
+
+	return texcache_rt_add_tag (address, tex, width, height,
+												target, rt_tex[type].informat, rt_tex[type].format);
 }
 
 
 void gx_render_to_texture (__u32 address, unsigned int x, unsigned int y,
-													 unsigned int w, unsigned int h, int mipmap)
+													 unsigned int w, unsigned int h, int mipmap, int type)
 {
-		if (!tag_render_target.tex)
-			gx_create_render_target ();
+	TextureTag *tag = texcache_rt_fetch (address, mipmap ? w/2 : w, mipmap ? h/2 : h);
+	__u8 *buffer = texbuff;
+	int i;
 
-		glBindTexture (GL_TEXTURE_RECTANGLE, tag_render_target.tex);
-		glReadBuffer (GL_BACK);
-		glCopyTexImage2D (GL_TEXTURE_RECTANGLE, 0, GL_RGBA, x, screen_height - (y + h), w, h, 0);
 
-		MEM32 (XFB_ADDRESS) = XFB_MAGIC;
+	if (h > screen_height)
+		return;
 
-		tag_render_target.xfb_mipmap = mipmap;
-		tag_render_target.p2 = FALSE;
-		tag_render_target.type = GL_TEXTURE_RECTANGLE;
+	if (tag && (tag->format != rt_tex[type].format))
+	{
+		texcache_rt_remove_tag (tag);
+		tag = NULL;
+	}
 
-		tag_render_target.width = w;
-		tag_render_target.height = h;
-		tag_render_target.address = address;
+	if (!tag)
+		tag = mipmap ? gx_create_render_target (address, w / 2, h / 2, type) :
+									 gx_create_render_target (address, w, h, type);
+
+	glEnable (tag->type);
+	glBindTexture (tag->type, tag->tex);
+	glReadBuffer (GL_BACK);
+
+	y = screen_height - (y + h);
+	glReadPixels (x, y, w, h, tag->format, rt_tex[type].type, buffer);
+
+	if (mipmap)
+	{
+		gluScaleImage (GL_RGBA, w, h, GL_UNSIGNED_BYTE, buffer,
+														w/2, h/2, GL_UNSIGNED_BYTE, texbuff2);
+		buffer = texbuff2;
+		h /= 2;
+		w /= 2;
+	}
+
+	for (i = 0; i < h; i++)
+		glTexSubImage2D (tag->type, 0, 0, h-1-i, w, 1,
+											tag->format, rt_tex[type].type,
+											buffer + w*i*rt_tex[type].csize);
+
+	if (tag->p2)
+	{
+		glTexParameteri (tag->type, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glTexParameteri (tag->type, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	}
+
+#if DUMP_RT
+	{
+		char filename[1024];
+		sprintf (filename, "rt%.2d%s_%8.8x.tga", tag->tex, (mipmap > 0) ? "mip" : "", address);
+		video_dump_texture (filename, buffer, w, h);
+	}
+#endif
 }

@@ -2,7 +2,7 @@
 #define __GDEBUG_H 1
 
 
-#define GCUBE_VERSION			"0.5"
+#define GCUBE_VERSION			"0.6"
 #define GCUBE_DESCRIPTION	("gcube v" GCUBE_VERSION)
 
 #ifdef GDEBUG

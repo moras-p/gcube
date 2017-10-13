@@ -22,6 +22,13 @@ void gx_set_scissors (void);
 void gx_set_viewport (void);
 void gx_set_gamma (void);
 void gx_copy_efb (void);
+void gx_set_fog (void);
+void gx_set_tev_konst_ra (int index);
+void gx_set_tev_konst_bg (int index);
+void gx_set_tev_indm_ab (int index);
+void gx_set_tev_indm_cd (int index);
+void gx_set_tev_indm_ef (int index);
+void gx_set_tev_indscale (int index);
 
 
 #endif // __GX_H

@@ -22,11 +22,11 @@
  *         
  */
 
-#include <SDL/SDL.h>
 #include <SDL/SDL_opengl.h>
+#include <SDL/SDL.h>
+#include "gl_ext.h"
 
 #include "video.h"
-#include "gl_ext.h"
 
 
 SDL_Surface *offscreen = NULL;
@@ -41,11 +41,14 @@ char window_title[256] = {0};
 
 unsigned int display_mode = 0;
 
+int disable_fb = FALSE;
 int fb_set = FALSE;
 int fullscreen = FALSE;
 int catch_frames = FALSE;
+int save_screenshot = FALSE;
 int screen_width = 0, screen_height = 0;
 extern int use_textures, use_colors;
+int fsaa = 0;
 
 // buffer for screenshots
 __u32 sbuff[640 * 528];
@@ -79,58 +82,8 @@ int video_event_filter (const SDL_Event *event)
 }
 
 
-// reinitialize if screen is not NULL
-int video_init (int w, int h)
+int video_init_fb (int w, int h)
 {
-	float max_anisotropy = 1;
-	int max_tex_units;
-
-
-	if ((screen && ((screen->w == w) && (screen->h == h))))
-		return FALSE;
-
-	if (!screen)
-	{
-		if (0 > SDL_Init (SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO))
-		{
-			fprintf (stderr, "SDL initialization failed: %s\n", SDL_GetError ());
-			return FALSE;
-		}
-//		atexit (video_close);
-	}
-
-	SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 5);
-	SDL_GL_SetAttribute (SDL_GL_GREEN_SIZE, 6);
-	SDL_GL_SetAttribute (SDL_GL_BLUE_SIZE, 5);
-	SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 16);
-	SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
-
-	video_set_icon ();
-	if (fullscreen)
-		screen = SDL_SetVideoMode (w, h, VID_BPP, SDL_HWSURFACE | SDL_OPENGL | SDL_FULLSCREEN);
-	else
-		screen = SDL_SetVideoMode (w, h, VID_BPP, SDL_HWSURFACE | SDL_OPENGL);
-	if (!screen)
-	{
-		fprintf (stderr, "SDL_SetVideoMode failed: %s\n", SDL_GetError ());
-		return FALSE;
-	}
-	SDL_ShowCursor (!fullscreen);
-
-	// check for extensions
-	if (!strstr (glGetString (GL_EXTENSIONS), "_texture_rectangle"))
-		gcube_quit ("Textured rectangle extension is not supported by Your video card!");
-
-#ifdef WINDOWS
-	gl_load_ext ();
-#endif
-
-	glGetFloatv (GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropy);
-	gx_set_max_anisotropy (max_anisotropy);
-
-	glGetIntegerv (GL_MAX_TEXTURE_UNITS_ARB, &max_tex_units);
-	// gx_set_max_texture_units (max_tex_units);
-	
 	if (offscreen)
 		SDL_FreeSurface (offscreen);
 	offscreen = SDL_CreateRGBSurface (SDL_HWSURFACE, w, h, VID_BPP,
@@ -158,7 +111,6 @@ int video_init (int w, int h)
 		return FALSE;
 	}
 
-
 	if (GL_TEXTURE_RECT == GL_TEXTURE_2D)
 	{
 		glMatrixMode (GL_TEXTURE);
@@ -166,22 +118,6 @@ int video_init (int w, int h)
 		glScalef (1.0/w, 1.0/h, 1);
 	}
 	
-	glMatrixMode (GL_PROJECTION);
-	glLoadIdentity ();
-	glViewport (0, 0, w, h);
-	glOrtho (0, w, h, 0, -1, 1);
-	glClearColor (0, 0, 0, 0);
-	glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glFrontFace (GL_CW);
-	glDisable (GL_CULL_FACE);
-	glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
-
-	glDepthFunc (GL_LEQUAL);
-	glEnable (GL_DEPTH_TEST);
-
-//	glTexEnvi (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-
 	if (fbtex)
 		glDeleteTextures (1, &fbtex);
 	glGenTextures (1, &fbtex);
@@ -220,6 +156,90 @@ int video_init (int w, int h)
 	r.x = r.y = 0;
 	r.w = w;
 	r.h = h;
+	
+	return TRUE;
+}
+
+
+// reinitialize if screen is not NULL
+int video_init (int w, int h)
+{
+	float max_anisotropy = 1;
+	int max_tex_units;
+
+
+	if ((screen && ((screen->w == w) && (screen->h == h))))
+		return FALSE;
+
+	if (!screen)
+	{
+		if (0 > SDL_Init (SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO))
+		{
+			fprintf (stderr, "SDL initialization failed: %s\n", SDL_GetError ());
+			return FALSE;
+		}
+	}
+
+	SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 8);
+	SDL_GL_SetAttribute (SDL_GL_GREEN_SIZE, 8);
+	SDL_GL_SetAttribute (SDL_GL_BLUE_SIZE, 8);
+	SDL_GL_SetAttribute (SDL_GL_ALPHA_SIZE, 8);
+	SDL_GL_SetAttribute (SDL_GL_DEPTH_SIZE, 16);
+	SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
+
+	if (fsaa)
+	{
+		SDL_GL_SetAttribute (SDL_GL_MULTISAMPLEBUFFERS, 1);
+		SDL_GL_SetAttribute (SDL_GL_MULTISAMPLESAMPLES, fsaa);
+	}
+
+	video_set_icon ();
+	if (fullscreen)
+		screen = SDL_SetVideoMode (w, h, VID_BPP, SDL_HWSURFACE | SDL_OPENGL | SDL_FULLSCREEN);
+	else
+		screen = SDL_SetVideoMode (w, h, VID_BPP, SDL_HWSURFACE | SDL_OPENGL);
+	if (!screen)
+	{
+		fprintf (stderr, "SDL_SetVideoMode failed: %s\n", SDL_GetError ());
+		return FALSE;
+	}
+	SDL_ShowCursor (!fullscreen);
+
+	// check for extensions
+	if (!strstr (glGetString (GL_EXTENSIONS), "_texture_rectangle"))
+		gcube_quit ("Textured rectangle extension is not supported by Your video card!");
+
+#ifdef WINDOWS
+	gl_load_ext ();
+#endif
+
+	glGetFloatv (GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropy);
+	gx_set_max_anisotropy (max_anisotropy);
+
+	glGetIntegerv (GL_MAX_TEXTURE_IMAGE_UNITS_ARB, &max_tex_units);
+
+	cg_init ();
+
+	if (fsaa)
+		glEnable (GL_MULTISAMPLE_ARB);
+
+	glMatrixMode (GL_PROJECTION);
+	glLoadIdentity ();
+	glViewport (0, 0, w, h);
+	glOrtho (0, w, h, 0, -1, 1);
+	glClearColor (0, 0, 0, 0);
+	glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glFrontFace (GL_CW);
+	glDisable (GL_CULL_FACE);
+	glPolygonMode (GL_FRONT_AND_BACK, GL_FILL);
+
+	glDepthFunc (GL_LEQUAL);
+	glEnable (GL_DEPTH_TEST);
+
+	if (!disable_fb)
+		if (!video_init_fb (w, h))
+			return FALSE;
 
 	DEBUG (EVENT_INFO, ".input: %d gamepad(s) connected", SDL_NumJoysticks ());
 	if (SDL_NumJoysticks ())
@@ -295,6 +315,8 @@ void video_close (void)
 
 	screen = NULL;
 
+	cg_cleanup ();
+
 	SDL_Quit ();
 }
 
@@ -317,11 +339,13 @@ void video_save_screenshot (void)
 		i++;
 	}
 
-	glReadPixels (0, 0, screen->w, screen->h, GL_RGBA, GL_UNSIGNED_BYTE, sbuff);
-	if (save_tga (filename, sbuff, screen->w, screen->h, TRUE, TRUE))
+	glReadPixels (0, 0, screen->w, screen->h, GL_BGR, GL_UNSIGNED_BYTE, sbuff);
+	if (save_tga_fast (filename, (__u8 *) sbuff, screen->w, screen->h))
 		printf ("%s written\n", filename);
 	else
 		printf ("couldn't write %s\n", filename);
+	
+	save_screenshot = FALSE;
 }
 
 
@@ -332,7 +356,7 @@ void video_save_frame (unsigned int n)
 
 	sprintf (filename, "%s/videos/frame-%.5d.tga", get_home_dir (), n);
 
-	glPixelZoom (1, -1);
+//	glPixelZoom (1, -1);
 	glReadPixels (0, 0, screen->w, screen->h, GL_BGR, GL_UNSIGNED_BYTE, sbuff);
 	glPixelZoom (1, 1);
 	if (save_tga_fast (filename, (__u8 *) sbuff, screen->w, screen->h))
@@ -344,6 +368,9 @@ void video_save_frame (unsigned int n)
 
 void video_fb_reinit (void)
 {
+	if (disable_fb)
+		return;
+
 	glViewport (0, 0, yuv->w, yuv->h);
 	glDepthRange (0, 1);
 
@@ -391,7 +418,6 @@ void video_draw_fb (void)
 	if (!yuv)
 		return;
 
-
 	if (SDL_DisplayYUVOverlay (yuv, &r))
 		printf ("couldn't display YUV overlay: %s\n", SDL_GetError ());
 
@@ -411,6 +437,8 @@ void video_draw (void)
 	SDL_GL_SwapBuffers ();
 	if (catch_frames)
 		video_save_frame (catch_frames++);
+	if (save_screenshot)
+		video_save_screenshot ();
 
 	sprintf (buff, "fps: %.2f", count_fps ());
 	video_set_title (buff);
@@ -465,13 +493,14 @@ void input_check (void)
 						gx_switch (GX_TOGGLE_WIREFRAME);
 						break;
 
-					// enables the use of new rendering engine
+					// switches between new and old rendering engine
 					case SDLK_F3:
 						gx_switch (GX_TOGGLE_ENGINE);
 						break;
-						
+					
+					// enable / disable fog (not yet correct)
 					case SDLK_F4:
-						gx_switch (GX_TOGGLE_FORCE_LINEAR);
+						gx_switch (GX_TOGGLE_FOG);
 						break;
 
 					// fix for nintendo puzzle collection
@@ -487,26 +516,18 @@ void input_check (void)
 						gx_switch (GX_TOGGLE_NO_LOGIC_OPS);
 						break;
 
-					// fix for custom robo
-					case SDLK_F7:
-						gx_switch (GX_TOGGLE_FULLBRIGHT);
-						break;
-/*					
 					// switches between mipmaps generated by the emulated program
 					// and opengl generated mipmaps
-					case SDLK_F8:
+					case SDLK_F7:
 						gx_switch (GX_TOGGLE_USE_GL_MIPMAPS);
 						break;
-*/
+
 					case SDLK_F8:
-						if (catch_frames)
-							catch_frames = 0;
-						else
-							catch_frames = 1;
+						catch_frames = !catch_frames;
 						break;
 
 					case SDLK_F9:
-						video_save_screenshot ();
+						save_screenshot = TRUE;
 						break;
 
 					case SDLK_F10:
@@ -530,6 +551,20 @@ void input_check (void)
 
 					case SDLK_BACKSPACE:
 						gx_switch (GX_TOGGLE_DRAW);
+						break;
+
+					case SDLK_BACKQUOTE:
+						gxswitches.use_shaders = !gxswitches.use_shaders;
+						cg_enable (gxswitches.use_shaders);
+						break;
+
+					case SDLK_1:
+						cg_fpcache_clear ();
+						break;
+						
+					case SDLK_2:
+						texcache_remove_all ();
+						texcache_rt_remove_all ();
 						break;
 
 					case SDLK_BACKSLASH:
@@ -633,7 +668,7 @@ void video_refresh (void)
 	{
 		video_draw ();
 
-		if (fb_set)
+		if (fb_set && !disable_fb)
 			video_draw_fb ();
 
 		input_check ();
@@ -660,8 +695,18 @@ void video_input_check (void)
 
 void video_set_framebuffer (unsigned char *addr)
 {
-	if (!yuv && !video_init (640, 480))
+	if (disable_fb)
+	{
+		if (!screen)
+			video_init (VIDEO_WIDTH, VIDEO_HEIGHT);
+
 		return;
+	}
+	else
+	{
+		if (!yuv && !video_init (VIDEO_WIDTH, VIDEO_HEIGHT))
+			return;
+	}
 
 	SDL_LockYUVOverlay (yuv);
 	yuv->pixels[0] = addr;
@@ -823,38 +868,7 @@ void video_set_gamma (float g)
 
 	if (!FLOAT_EQ (g, last_gamma))
 	{
-		SDL_SetGamma (g, g, g);
+//		SDL_SetGamma (g, g, g);
 		last_gamma = g;
-	}
-}
-
-
-void gl_reset_error (void)
-{
-	glGetError ();
-}
-
-
-void gl_check_error (void)
-{
-	int err = glGetError ();
-
-
-	if (!err)
-		return;
-
-	switch (err)
-	{
-		case 0x501:
-			printf ("GL: INVALID ENUM\n");
-			break;
-
-		case 0x502:
-			printf ("GL: INVALID OPERATION\n");
-			break;
-
-		default:
-			printf ("GL: ERROR 0x%4.4x\n", err);
-			break;
 	}
 }

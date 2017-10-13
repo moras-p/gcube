@@ -1,0 +1,110 @@
+
+uniform sampler2D TU[8] : TEXUNIT0;
+uniform samplerRECT TUR[8] : TEXUNIT0;
+uniform float4 cconst[4];
+uniform float4 kconst[4];
+uniform float2x3 indm[3];
+uniform float indscale[3];
+uniform int aref[2];
+uniform int2 TUS[8];
+
+#define clamp1(a)			(clamp (a, 0, 1))
+#define clampu8(a) 		(a)
+#define clamps10(a) 	(a)
+
+#define COLOR(n)									IN.col[n]
+#define TEX_P2(u,n)								tex2Dproj (TU[u], IN.tex[n].stq / float3 (TUS[u].xy,1))
+#define TEX(u,n)									texRECTproj (TUR[u], IN.tex[n].stq)
+#define F31(f1,f2)								float4 (float3 (f1), f2)
+#define DEPTH_ADD(bias)						{ OUT.depth = clamp1 (IN.wpos.z + TEXCA.r + (bias)); }
+#define DEPTH_REPLACE(bias)				{ OUT.depth = clamp1 (TEXCA.r + (bias)); }
+
+#define TC_FORMAT(c,f)					(round (c * f) / f)
+#define TC_WRAP_X(c,w)					fmod (fmod (c, w) + w, w)
+#define TC(n)										IN.tex[n]
+#define TTEX(u,c)								texRECTproj (TUR[u], c.xyz)
+#define TTEX_SH(u,c,sh)					texRECTproj (TUR[u], c.xyz + sh.xyz * float3 (TUS[u].xy, 1))
+#define TTEX_P2(u,c)						tex2Dproj (TU[u], c.xyz * float3 (1.0/TUS[u].xy, 1))
+#define TTEX_SH_P2(u,c,sh)			tex2Dproj (TU[u], c.xyz * float3 (1.0/TUS[u].xy, 1) + sh.xyz * float3 (1.0/TUS[u].xy, 0))
+
+
+#define PREV				OUT.col
+#define CPREV				PREV.rgb
+#define APREV				PREV.a
+#define RASC				RASCA.rgb
+#define RASA				RASCA.a
+#define TEXC				TEXCA.rgb
+#define TEXA				TEXCA.a
+#define C0					REG0.rgb
+#define A0					REG0.a
+#define C1					REG1.rgb
+#define A1					REG1.a
+#define C2					REG2.rgb
+#define A2					REG2.a
+#define CKONST			KONSTCA.rgb
+#define AKONST			KONSTCA.a
+#define K0					kconst[0]
+#define K1					kconst[1]
+#define K2					kconst[2]
+#define K3					kconst[3]
+
+#define ONE					float4 (1, 1, 1, 1)
+#define HALF				float4 (0.5, 0.5, 0.5, 0.5)
+#define QUARTER			float4 (0.25, 0.25, 0.25, 0.25)
+#define ZERO				float4 (0, 0, 0, 0)
+
+#define CONE				ONE.rgb
+#define AONE				ONE.a
+#define CHALF				HALF.rgb
+#define AHALF				HALF.a
+#define CZERO				ZERO.rgb
+#define AZERO				ZERO.a
+
+
+#define lerp3(a,b,c)				lerp (float3 (a), float3 (b), float3 (c))
+#define lerp1(a,b,c)				lerp (float (a), float (b), float (c))
+
+
+#define CMP_R8_EQ(c1,c2)		(round (c1.r * 255) == round (c2.r * 255))
+#define CMP_GR16_EQ(c1,c2)	(all (round (c1.gr * 255) == round (c2.gr * 255)))
+#define CMP_BGR24_EQ(c1,c2)	(all (round (c1.bgr * 255) == round (c2.bgr * 255)))
+#define CMP_RGB8_EQ(c1,c2)	(round (c1.rgb * 255) == round (c2.rgb * 255))
+#define CMP_A8_EQ(c1,c2)		(round (c1.a * 255) == round (c2.a * 255))
+#define CMP_R8_GT(c1,c2)		(c1.r > c2.r)
+#define CMP_GR16_GT(c1,c2)	((c1.g * 256 + c1.r) > (c2.g * 256 + c2.r))
+#define CMP_BGR24_GT(c1,c2)	((c1.b * 65536 + c1.g * 256 + c1.r) > (c2.b * 65536 + c2.g * 256 + c2.r))
+#define CMP_RGB8_GT(c1,c2)	(c1.rgb > c2.rgb)
+#define CMP_A8_GT(c1,c2)		(c1.a > c2.a)
+
+
+#define DO_FOG(f)			{ OUT.col.rgb = lerp3 (glstate.fog.color, CPREV, f); }
+#define FOG_LINEAR		{ DO_FOG ((glstate.fog.params.z - IN.fog) * glstate.fog.params.w); }
+#define FOG_EXP				{ DO_FOG (exp (-glstate.fog.params.x * IN.fog)); }
+#define FOG_EXP2			{ DO_FOG (exp (-pow (glstate.fog.params.x * IN.fog, 2))); }
+#define FOG_BEXP			FOG_EXP
+#define FOG_BEXP2			FOG_EXP2
+
+#define rDEBUG									{ OUT.col = float4 (1, 0, 0, 1); return OUT; }
+#define gDEBUG									{ OUT.col = float4 (0, 1, 0, 1); return OUT; }
+#define bDEBUG									{ OUT.col = float4 (0, 0, 1, 1); return OUT; }
+
+
+struct vpout
+{
+	float4 pos : POSITION;
+	float4 col[2] : COLOR0;
+	float4 tex[8] : TEXCOORD0;
+	float fog : FOG;
+
+	float4 wpos : WPOS;
+};
+
+struct fpout
+{
+	float4 col : COLOR;
+	float depth : DEPTH;
+};
+
+float4 REG0, REG1, REG2, RASCA, TEXCA, KONSTCA, BUMP;
+float3 ST, STsh, iST[3];
+int A;
