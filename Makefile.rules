@@ -1,0 +1,192 @@
+CDIR=code
+ODIR=obj
+EXTERNAL_DIR=external
+ICONS_DIR=icons
+TOOLS_DIR=tools
+TOOLS_CDIR=$(TOOLS_DIR)/code
+SCANDIR_DIR=$(EXTERNAL_DIR)/scandir
+SAMPLES_DIR=samples
+
+JPEG_DIR=jpeg-6b
+JPEG_LIB=libjpeg.a
+
+RM=rm -f
+DRM=rm -Rf
+
+QUIET=-std=gnu89 -Wno-pointer-sign -Wno-incompatible-pointer-types -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-format-security -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-variable
+PROFLAGS=-g -Wall -pg -fprofile-arcs -ftest-coverage
+OPTFLAGS=-O3 -fno-strict-aliasing -fomit-frame-pointer -ffast-math -march=$(CPU) $(OPTIMIZE)
+INCLUDES=-I/usr/include -I/usr/local/include -I$(EXTERNAL_DIR)/include -I$(EXTERNAL_DIR)/ppc_disasm -I$(EXTERNAL_DIR)/$(JPEG_DIR) -I$(CDIR)
+
+ifeq ($(WINDOWS), 1)
+# we don't want the -mwindows and -Dmain=SDL_main
+SDL_LIBS=`sh sdl-config --libs | sed -e "s/-mwindows//g"`
+SDL_CFLAGS=`sh sdl-config --cflags | sed -e "s/-Dmain=SDL_main//g"`
+CONFIGURE=sh configure
+else
+SDL_LIBS=`sdl-config --libs`
+SDL_CFLAGS=`sdl-config --cflags`
+CONFIGURE=./configure
+endif
+
+LIBS=$(SDL_LIBS) -L$(EXTERNAL_DIR)/libs -lz -l$(OPENGL) -lm
+CFLAGS+=-g -fgnu89-inline -Wall $(INCLUDES) $(QUIET) $(SDL_CFLAGS)
+
+OBJECTS+=\
+	 general.o\
+	 config.o\
+	 diskio.o\
+	 video_sdl.o\
+	 audio_sdl.o\
+	 hle.o\
+	 hle_general.o\
+	 hle_math.o\
+	 gx.o\
+	 gx_texture.o\
+	 gx_transform.o\
+	 hw.o\
+	 hw_ai_dsp.o\
+	 hw_cp.o\
+	 hw_exi.o\
+	 hw_gx.o\
+	 hw_mi.o\
+	 hw_pe.o\
+	 hw_pi.o\
+	 hw_si.o\
+	 hw_vi.o\
+	 hw_di.o\
+	 cpu.o\
+	 mem.o\
+	 ppc_disasm.o\
+	 gcube.o\
+	 $(ADDS_OBJ)
+
+
+ifeq ($(ASM_X86), 1)
+CFLAGS+=-DASM_X86
+endif
+
+ifneq ($(GDEBUG), 0)
+OBJECTS+=txlib.o
+CFLAGS+=-DGDEBUG
+CFLAGS+=-DDEFAULT_COLOR_MODE=$(DEFAULT_COLOR_MODE)
+ifeq ($(WINDOWS), 1)
+LIBS+=-lpdcurses
+else
+LIBS+=-lncurses
+endif
+endif
+
+ifeq ($(GDEBUG), 2)
+CFLAGS+=-DGCUBE_BY_DEFAULT
+endif
+
+ifeq ($(ALWAYS_WINDOW), 1)
+CFLAGS+=-DOPEN_WINDOW_ON_START
+endif
+
+ifeq ($(MEMHACK), 1)
+CFLAGS+=-DMEMHACK
+endif
+
+ifeq ($(NO_A_STANDOUT), 1)
+CFLAGS+=-DNO_A_STANDOUT
+endif
+
+ifeq ($(USE_BITOPS_H), 1)
+CFLAGS+=-DUSE_BITOPS_H=1
+endif
+
+ifeq ($(USE_BYTESWAP_H), 1)
+CFLAGS+=-DUSE_BYTESWAP_H=1
+endif
+
+ifneq ($(ENABLE_SOUND), 0)
+CFLAGS+=-DENABLE_SOUND
+endif
+
+ifeq ($(WINDOWS), 1)
+CFLAGS+=-DWINDOWS -DNEED_SCANDIR -DLOAD_GLEXT -I$(SCANDIR_DIR)
+endif
+
+# redirect temp objects to ODIR
+OOBJ=$(patsubst %,$(ODIR)/%,$(OBJECTS))
+
+
+ifeq ($(MAKE_TOOLS), 0)
+default: gcube
+else
+default: gcube tools
+endif
+
+release:	CFLAGS+=$(OPTFLAGS) -s
+profiler:	CFLAGS+=$(PROFLAGS)
+
+all:	default
+release: default
+profiler:	default
+tools: bin2dol tplx isopack mdbconv
+
+$(ODIR)/%.o: $(CDIR)/%.c
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $^ -o $@
+
+gcube:  $(OOBJ)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBS)
+
+$(ODIR)/gcube.o: $(CDIR)/gcube.c
+	$(CC) $(CFLAGS) -O0 -c $^ -o $@
+
+$(ODIR)/res.o: $(CDIR)/res.rc
+	windres -I$(ICONS_DIR) -o $@ $<
+
+$(ODIR)/scandir.o:	$(SCANDIR_DIR)/scandir.c
+	$(CC) $(CFLAGS) -c $^ -o $@
+
+# kill the warnings for ppc_disasm
+$(ODIR)/ppc_disasm.o: $(EXTERNAL_DIR)/ppc_disasm/ppc_disasm.c
+	$(CC) $(CFLAGS) -I$(CDIR) -w -c -o $@ $<
+
+$(ODIR)/video_sdl.o: $(CDIR)/video_sdl.c $(CDIR)/icon.c
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) -c -o $@ $< 
+
+bin2dol:	$(TOOLS_CDIR)/bin2dol.c $(ODIR)/general.o
+	$(CC) $(CFLAGS) $^ -o $@
+
+mdbconv:	$(TOOLS_CDIR)/mdbconv.c $(ODIR)/general.o
+	$(CC) $(CFLAGS) $^ -o $@
+	#mdbconv $(SAMPLES_DIR)/demo.mdb
+
+tplx: $(TOOLS_CDIR)/tplx.c $(ODIR)/general.o
+	$(CC) $(CFLAGS) $^ -o $@
+	#tplx $(SAMPLES_DIR)/demo.tpl
+
+isopack: $(TOOLS_CDIR)/isopack.c $(ODIR)/general.o
+	$(CC) $(CFLAGS) $^ -o $@ -lz
+
+thpview: $(TOOLS_CDIR)/thpview.c $(ODIR)/general.o $(ODIR)/jpeg_tools.o $(ODIR)/timer_sdl.o $(EXTERNAL_DIR)/$(JPEG_DIR)/$(JPEG_LIB)
+	$(CC) -Wno-pointer-sign $(CFLAGS) $(SDL_CFLAGS) $^ -o $@ -I$(TOOLS_CDIR) $(SDL_LIBS)
+	#thpview $(SAMPLES_DIR)/demo.thp
+
+$(EXTERNAL_DIR)/$(JPEG_DIR)/Makefile:
+	cd $(EXTERNAL_DIR)/$(JPEG_DIR); $(CONFIGURE)
+
+$(EXTERNAL_DIR)/$(JPEG_DIR)/$(JPEG_LIB): $(EXTERNAL_DIR)/$(JPEG_DIR)/Makefile
+	cd $(EXTERNAL_DIR)/$(JPEG_DIR); make $(JPEG_LIB)
+
+clean-jpeg: 
+	-cd $(EXTERNAL_DIR)/$(JPEG_DIR); make clean
+
+distclean-jpeg:
+	-cd $(EXTERNAL_DIR)/$(JPEG_DIR); make distclean
+
+clean-runnable:
+	$(RM) gcube.exe bin2dol.exe adp2wav.exe gcmap.exe isopack.exe tplx.exe thpview.exe mdbconv.exe
+	$(RM) gcube bin2dol adp2wav gcmap isopack tplx thpview mdbconv
+
+clean-other:
+	$(RM) $(ODIR)/*.* *.o *.bb *.bbg *.da *.tga gmon.out out.wav dump.sw stderr.txt stdout.txt $(CDIR)/cg_fragment.c
+
+clean: clean-runnable clean-jpeg clean-other
+
+distclean: clean-runnable distclean-jpeg clean-other
+	$(DRM) maps screenshots videos memcard_a.gmc memcard_b.gmc gcuberc

@@ -1,0 +1,51 @@
+# use assembler optimizations
+ASM_X86=0
+
+# use debugger: 1 - by default, 2 - compile in but don't use by default
+GDEBUG=0
+
+# by default, no window will open until fb address is set
+# or video mode is specified. some programs might not reach that stage.
+ALWAYS_WINDOW=0
+
+# default audio buffer size (the smaller - the faster response)
+# from 512 to 8192
+DEFAULT_BUFFER_SIZE=512
+
+# some programs set the framebuffer at 0xc0000000 which gets translated
+# to the same address as 0x80000000 and so they quickly start to overwrite
+# their own code. if you really want to run them, change this to 1.
+MEMHACK=0
+
+# specify the cpu used (for -march, check gcc manual)
+#CPU=i686
+CPU=core2
+
+# add here optimization flags
+#OPTIMIZE=-msse -m64
+
+# opengl library
+OPENGL=GL
+
+# compilator
+CC=gcc
+
+# if byteswap.h is present
+USE_BYTESWAP_H=1
+
+# if bitops.h is present
+USE_BITOPS_H=0
+
+# default debugger color mode
+DEFAULT_COLOR_MODE=2
+
+# no sound
+ENABLE_SOUND=0
+
+# mmu emulation
+MMU_ENABLED=0
+
+# build tools
+MAKE_TOOLS=0
+
+include Makefile.rules

@@ -1,0 +1,257 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="code\audio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\cpu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\diskio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\elf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\gcube.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\gdebug.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\general.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\gx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\gx_cunpacks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\gx_texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\gx_transform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_ai_dsp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_cp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_di.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_exi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_gx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_mi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_pe.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_pi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_si.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\hw_vi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\jpeg_tools.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\keys_sdl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\mem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\tools_c.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\tools_x86.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\txlib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\video.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tools\code\thpview.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="external\ppc_disasm\ppc_disasm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="external\scandir\scandir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="code\audio_sdl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\config.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\cpu.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\diskio.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\font_ansi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\font_sjis.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\gcube.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\general.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\gx.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\gx_cunpacks.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\gx_texture.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\gx_transform.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hle.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hle_general.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hle_math.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_ai_dsp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_cp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_di.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_exi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_gx.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_mi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_pe.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_pi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_si.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\hw_vi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\icon.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\jpeg_tools.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\mapdb.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\mem.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\txlib.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\video_sdl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tools\code\adp2wav.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tools\code\bin2dol.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tools\code\isopack.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tools\code\mdbconv.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tools\code\thpview.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="external\scandir\scandir.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="external\ppc_disasm\ppc_disasm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ChangeLog" />
+    <None Include="COPYING" />
+    <None Include="README.debug" />
+    <None Include="Makefile.rules" />
+    <None Include="Makefile.win" />
+    <None Include="README.md" />
+    <None Include="README.info" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="code\res.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

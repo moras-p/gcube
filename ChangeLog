@@ -1,0 +1,26 @@
+
+  0.4   - better interrupt handling and dsp emulation
+        - input should work in more games now
+        - improved gx emulation (with new engine at its early stage)
+        - savestates can be created without the debugger
+        - simple thp video player included (thpview)
+
+  0.3   - should now work on mac os x (thanks to Adam Green)
+        - basic hle system
+        - function mapper
+        - fixed a few problems with pad emulation
+        - further debugger improvements
+        - killed some ugly cpu bugs
+        - fixes here and there
+
+  0.2   - support for gcm's and compressed gcm's
+        - virtual dvd support (mounting directory as the dvd root)
+        - improved gx emulation
+        - debugger is working on windows
+        - file / gcm browser
+        - OSReport emulation
+        - various fixes
+
+        See notes in README for more description.
+
+  0.1   first release

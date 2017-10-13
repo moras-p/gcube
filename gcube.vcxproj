@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{83A82D5D-9E23-429D-AD54-E2DD6EF3A557}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <NMakeBuildCommandLine>make -f Makefile.win</NMakeBuildCommandLine>
+    <NMakeOutput>$(ProjectName).exe</NMakeOutput>
+    <NMakeCleanCommandLine>make -f Makefile.win distclean</NMakeCleanCommandLine>
+    <NMakeReBuildCommandLine>make -f Makefile.win clean default</NMakeReBuildCommandLine>
+    <NMakePreprocessorDefinitions>WIN32_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <IncludePath>code;external;external/ppc_disasm;external/scandir;external/jpeg-mmx;tools/code;../icons;C:\MinGW\msys\1.0\include;C:\MinGW\include;$(IncludePath)</IncludePath>
+    <SourcePath>../tools/code;$(SourcePath)</SourcePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <NMakeBuildCommandLine>make -f Makefile.win default</NMakeBuildCommandLine>
+    <NMakeOutput>$(ProjectName).exe</NMakeOutput>
+    <NMakeCleanCommandLine>make -f Makefile.win distclean</NMakeCleanCommandLine>
+    <NMakeReBuildCommandLine>make -f Makefile.win clean default</NMakeReBuildCommandLine>
+    <NMakePreprocessorDefinitions>_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <NMakeBuildCommandLine>make -f Makefile.vs gcube</NMakeBuildCommandLine>
+    <NMakeOutput>$(ProjectName).exe</NMakeOutput>
+    <NMakeCleanCommandLine>make -f Makefile.vs clean</NMakeCleanCommandLine>
+    <NMakeReBuildCommandLine>make -f Makefile.vs clean gcube</NMakeReBuildCommandLine>
+    <NMakePreprocessorDefinitions>WIN32NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <NMakeBuildCommandLine>make -f Makefile.vs gcube</NMakeBuildCommandLine>
+    <NMakeOutput>$(ProjectName).exe</NMakeOutput>
+    <NMakeCleanCommandLine>make -f Makefile.vs clean</NMakeCleanCommandLine>
+    <NMakeReBuildCommandLine>make -f Makefile.vs clean gcube</NMakeReBuildCommandLine>
+    <NMakePreprocessorDefinitions>NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="code\audio.h" />
+    <ClInclude Include="code\config.h" />
+    <ClInclude Include="code\cpu.h" />
+    <ClInclude Include="code\diskio.h" />
+    <ClInclude Include="code\elf.h" />
+    <ClInclude Include="code\gcube.h" />
+    <ClInclude Include="code\gdebug.h" />
+    <ClInclude Include="code\general.h" />
+    <ClInclude Include="code\gx.h" />
+    <ClInclude Include="code\gx_cunpacks.h" />
+    <ClInclude Include="code\gx_texture.h" />
+    <ClInclude Include="code\gx_transform.h" />
+    <ClInclude Include="code\hle.h" />
+    <ClInclude Include="code\hw.h" />
+    <ClInclude Include="code\hw_ai_dsp.h" />
+    <ClInclude Include="code\hw_cp.h" />
+    <ClInclude Include="code\hw_di.h" />
+    <ClInclude Include="code\hw_exi.h" />
+    <ClInclude Include="code\hw_gx.h" />
+    <ClInclude Include="code\hw_mi.h" />
+    <ClInclude Include="code\hw_pe.h" />
+    <ClInclude Include="code\hw_pi.h" />
+    <ClInclude Include="code\hw_si.h" />
+    <ClInclude Include="code\hw_vi.h" />
+    <ClInclude Include="code\jpeg_tools.h" />
+    <ClInclude Include="code\keys_sdl.h" />
+    <ClInclude Include="code\mem.h" />
+    <ClInclude Include="code\tools_c.h" />
+    <ClInclude Include="code\tools_x86.h" />
+    <ClInclude Include="code\txlib.h" />
+    <ClInclude Include="code\types.h" />
+    <ClInclude Include="code\video.h" />
+    <ClInclude Include="external\ppc_disasm\ppc_disasm.h" />
+    <ClInclude Include="external\scandir\scandir.h" />
+    <ClInclude Include="tools\code\thpview.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="code\audio_sdl.c" />
+    <ClCompile Include="code\config.c" />
+    <ClCompile Include="code\cpu.c" />
+    <ClCompile Include="code\diskio.c" />
+    <ClCompile Include="code\font_ansi.c" />
+    <ClCompile Include="code\font_sjis.c" />
+    <ClCompile Include="code\gcube.c" />
+    <ClCompile Include="code\general.c" />
+    <ClCompile Include="code\gx.c" />
+    <ClCompile Include="code\gx_cunpacks.c" />
+    <ClCompile Include="code\gx_texture.c" />
+    <ClCompile Include="code\gx_transform.c" />
+    <ClCompile Include="code\hle.c" />
+    <ClCompile Include="code\hle_general.c" />
+    <ClCompile Include="code\hle_math.c" />
+    <ClCompile Include="code\hw.c" />
+    <ClCompile Include="code\hw_ai_dsp.c" />
+    <ClCompile Include="code\hw_cp.c" />
+    <ClCompile Include="code\hw_di.c" />
+    <ClCompile Include="code\hw_exi.c" />
+    <ClCompile Include="code\hw_gx.c" />
+    <ClCompile Include="code\hw_mi.c" />
+    <ClCompile Include="code\hw_pe.c" />
+    <ClCompile Include="code\hw_pi.c" />
+    <ClCompile Include="code\hw_si.c" />
+    <ClCompile Include="code\hw_vi.c" />
+    <ClCompile Include="code\icon.c" />
+    <ClCompile Include="code\jpeg_tools.c" />
+    <ClCompile Include="code\mapdb.c" />
+    <ClCompile Include="code\mem.c" />
+    <ClCompile Include="code\txlib.c" />
+    <ClCompile Include="code\video_sdl.c" />
+    <ClCompile Include="external\ppc_disasm\ppc_disasm.c" />
+    <ClCompile Include="external\scandir\scandir.c" />
+    <ClCompile Include="tools\code\adp2wav.c" />
+    <ClCompile Include="tools\code\bin2dol.c" />
+    <ClCompile Include="tools\code\isopack.c" />
+    <ClCompile Include="tools\code\mdbconv.c" />
+    <ClCompile Include="tools\code\thpview.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ChangeLog" />
+    <None Include="COPYING" />
+    <None Include="Makefile.rules" />
+    <None Include="Makefile.win" />
+    <None Include="README.debug" />
+    <None Include="README.info" />
+    <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="code\res.rc" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
