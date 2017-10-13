@@ -302,7 +302,6 @@ Map *map_load_full (char *filename)
 		filename = path;
 	}
 
-	map = map_create (filename);
 	f = fopen (filename, "r");
 
 	while (!feof (f) && !strlen (line))
@@ -312,6 +311,7 @@ Map *map_load_full (char *filename)
 		  	(0 == strncmp (line, "Link map", 8))))
 		return NULL;
 
+	map = map_create (filename);
 	// process only .init and .text sections
 	for (i = 0; i < 2; i++)
 	{
@@ -368,9 +368,9 @@ Map *map_load (char *filename)
 		filename = path;
 	}
 
-	map = map_create (filename);
 	f = fopen (filename, "r");
 	
+	map = map_create (filename);
 	while (!feof (f))
 	{
 		fscanf (f, " %4096[^\n]\n", line);
@@ -1024,8 +1024,8 @@ int hle_function (Map *map, const char *name, int attach)
 {
 	int i;
 	MapItem *mi;
-	
-	
+
+
 	mi = map_get_item_by_name (map, (char *) name);
 	i = hle_find_by_name (name);
 	if (!mi || !i)

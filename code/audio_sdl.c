@@ -44,7 +44,7 @@ void memcpy_swap16 (char *dest, char *src, int len)
 }
 
 
-void fill_stream_callback (void *userdata, unsigned char *stream, int len)
+void audio_fill_stream_callback (void *userdata, unsigned char *stream, int len)
 {
 	if (buffer_len)
 	{
@@ -70,7 +70,7 @@ void fill_stream_callback (void *userdata, unsigned char *stream, int len)
 	}
 	else
 	{
-		dsp_finished ();
+//		dsp_finished ();
 		SDL_PauseAudio (TRUE);
 	}
 }
@@ -92,7 +92,7 @@ int audio_init (unsigned int freq, unsigned int samples)
 	desired.samples = samples;
 	
 	desired.format = AUDIO_S16MSB;
-	desired.callback = fill_stream_callback;
+	desired.callback = audio_fill_stream_callback;
 	desired.channels = 1;
 
 	if (0 > SDL_OpenAudio (&desired, &obtained))

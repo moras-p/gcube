@@ -5,10 +5,6 @@
 #include "general.h"
 #include "diskio.h"
 
-#ifdef WINDOWS
-# include "scandir.h"
-#endif
-
 #define RDI_SIZE						0x100
 #define RDI_MASK						0x0ff
 

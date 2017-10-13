@@ -55,6 +55,18 @@ extern __u8 L2C[L2C_SIZE];
 #define L2C32(A)			(*((__u32 *) &L2C (A)))
 #define L2C64(A)			(*((__u64 *) &L2C (A)))
 
+#define EFB_SIZE			0x0020fa00
+extern __u8 EFB[EFB_SIZE];
+
+#define EFB_WIDTH				640
+#define EFB_HEIGHT			528
+#define EFB(X)					(EFB[((((X) & 0xfff)>>2) + ((((X) & 0x3ff000) >> 12)*EFB_WIDTH))*4])
+#define EFB16(X)				(*((__u16 *) &EFB (X)))
+#define EFB32(X)				(*((__u32 *) &EFB (X)))
+
+#define MMU_OK					1
+#define MMU_ERROR				0
+
 
 typedef union
 {
@@ -147,6 +159,7 @@ typedef union
 #define MEM_COPY_TO_PTR			mem_copy_to_ptr
 #define MEM_COPY_FROM_PTR		mem_copy_from_ptr
 
+#define SINGLE_TO_DOUBLE(X)		(((Double64) ((double) ((Single32) X).fp)).bin)
 
 // reads
 #define MEM_RBYTE				read_byte
@@ -211,12 +224,12 @@ __u16 read_half_word (__u32 addr);
 __u32 read_word_r (__u32 addr);
 __u32 read_word (__u32 addr);
 __u64 read_double (__u32 addr);
-void write_byte (__u32 addr, __u8 data);
-void write_half_word_r (__u32 addr, __u16 data);
-void write_half_word (__u32 addr, __u16 data);
-void write_word_r (__u32 addr, __u32 data);
-void write_word (__u32 addr, __u32 data);
-void write_double (__u32 addr, __u64 data);
+int write_byte (__u32 addr, __u8 data);
+int write_half_word_r (__u32 addr, __u16 data);
+int write_half_word (__u32 addr, __u16 data);
+int write_word_r (__u32 addr, __u32 data);
+int write_word (__u32 addr, __u32 data);
+int write_double (__u32 addr, __u64 data);
 
 inline __u8 mem_read8_safe (__u32 addr);
 inline __u32 mem_read32_safe (__u32 addr);
@@ -232,6 +245,6 @@ void mem_hww_hook (int bits, __u32 addr, void *ptr);
 void mem_set (__u32 addr, __u8 fill, __u32 size);
 void mem_copy_to_ptr (__u8 *dst, __u32 address, __u32 size);
 void mem_copy_from_ptr (__u32 address, __u8 *src, __u32 size);
-
+int mem_dump (const char *filename, __u32 address, __u32 length);
 
 #endif // __MEM_H

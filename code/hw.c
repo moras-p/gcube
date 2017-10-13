@@ -304,8 +304,6 @@ void install_exception_handlers (void)
 
 void hw_set_video_mode (int country_code)
 {
-	vi_set_country_code (country_code);
-
 	if (country_code == 'E' || country_code == 'J')
 	{
 		MEM_WWORD (MEM_TV_MODE, TV_MODE_NTSC);
@@ -316,6 +314,8 @@ void hw_set_video_mode (int country_code)
 		MEM_WWORD (MEM_TV_MODE, TV_MODE_PAL);
 		vi_set_video_mode (TV_MODE_PAL);
 	}
+
+	vi_set_country_code (country_code);
 }
 
 

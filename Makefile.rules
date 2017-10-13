@@ -29,10 +29,16 @@ SDL_CFLAGS=`sdl-config --cflags`
 CONFIGURE=./configure
 endif
 
-LIBS=$(SDL_LIBS) -L$(EXTERNAL_DIR)/libs -lz -l$(OPENGL) -lm
+LIBS=$(SDL_LIBS) -L$(EXTERNAL_DIR)/libs -lz -lm -l$(OPENGL) -lCg -lCgGL
 CFLAGS+=-g -fgnu89-inline -Wall $(INCLUDES) $(QUIET) $(SDL_CFLAGS)
 
+OBJECTS=\
+	 timer_sdl.o\
+	 dsp_opcodes.o\
+	 dsp_disassemble.o
+	 
 OBJECTS+=\
+	 mapdb.o\
 	 general.o\
 	 config.o\
 	 diskio.o\
@@ -107,6 +113,13 @@ endif
 
 ifeq ($(WINDOWS), 1)
 CFLAGS+=-DWINDOWS -DNEED_SCANDIR -DLOAD_GLEXT -I$(SCANDIR_DIR)
+LIBS+=-lGLU32
+else
+LIBS+=-lGLU
+endif
+
+ifneq ($(MMU_ENABLED), 0)
+CFLAGS+=-DMMU_ENABLED
 endif
 
 # redirect temp objects to ODIR
@@ -125,7 +138,11 @@ profiler:	CFLAGS+=$(PROFLAGS)
 all:	default
 release: default
 profiler:	default
-tools: bin2dol tplx isopack mdbconv
+tools: bin2dol tplx isopack mdbconv thpview
+#adp2wav 
+
+#%.o:	$(CDIR)/%.c
+	#$(CC) $(CFLAGS) -c $^ -o $@
 
 $(ODIR)/%.o: $(CDIR)/%.c
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $^ -o $@
@@ -138,6 +155,13 @@ $(ODIR)/gcube.o: $(CDIR)/gcube.c
 
 $(ODIR)/res.o: $(CDIR)/res.rc
 	windres -I$(ICONS_DIR) -o $@ $<
+
+$(ODIR)/jpeg_tools.o: $(EXTERNAL_DIR)/$(JPEG_DIR)/jconfig.h
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $(CDIR)/jpeg_tools.c -o $@
+
+#$(ODIR)/cg.o: $(CDIR)/cg_fragment.c $(CDIR)/cg.c
+$(ODIR)/cg.o: $(CDIR)/cg.c
+	$(CC) $(CFLAGS) -c $(CDIR)/cg.c -o $@
 
 $(ODIR)/scandir.o:	$(SCANDIR_DIR)/scandir.c
 	$(CC) $(CFLAGS) -c $^ -o $@
@@ -166,6 +190,13 @@ isopack: $(TOOLS_CDIR)/isopack.c $(ODIR)/general.o
 thpview: $(TOOLS_CDIR)/thpview.c $(ODIR)/general.o $(ODIR)/jpeg_tools.o $(ODIR)/timer_sdl.o $(EXTERNAL_DIR)/$(JPEG_DIR)/$(JPEG_LIB)
 	$(CC) -Wno-pointer-sign $(CFLAGS) $(SDL_CFLAGS) $^ -o $@ -I$(TOOLS_CDIR) $(SDL_LIBS)
 	#thpview $(SAMPLES_DIR)/demo.thp
+
+adp2wav:	$(TOOLS_CDIR)/adp2wav.c $(ODIR)/general.o
+	$(CC) $(CFLAGS) $^ -o $@
+	#adp2wav $(SAMPLES_DIR)/demo.adp > out.wav
+
+$(EXTERNAL_DIR)/$(JPEG_DIR)/jconfig.h:
+	cd $(EXTERNAL_DIR)/$(JPEG_DIR); $(CONFIGURE)
 
 $(EXTERNAL_DIR)/$(JPEG_DIR)/Makefile:
 	cd $(EXTERNAL_DIR)/$(JPEG_DIR); $(CONFIGURE)

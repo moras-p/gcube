@@ -205,6 +205,18 @@ inline int is_power_of_two (__u32 a)
 }
 
 
+int closest_upper_power_of_two (__u32 a)
+{
+	int i = 1;
+
+
+	while (i < a)
+		i <<= 1;
+	
+	return i;
+}
+
+
 __u32 crc_setup (unsigned int bits)
 {
 	__u32 crc = 0, i;
@@ -239,53 +251,54 @@ __u32 crc_iterate (__u32 crc, __u8 d)
 }
 
 
-void create_dir(char *name)
+void create_dir (char *name)
 {
 	char buff[1024];
 
 
-	sprintf(buff, "%s/%s", home_dir, name);
+	sprintf (buff, "%s/%s", home_dir, name);
 #ifdef WINDOWS
-	mkdir(buff);
+	mkdir (buff);
 #else
-	mkdir(buff, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+	mkdir (buff, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
 #endif
 }
 
 
-void create_dir_tree(char *parent)
+void create_dir_tree (char *parent)
 {
-	char *str = getenv("HOME");
+	char *str = getenv ("HOME");
 	// first try HOME (linux)
-	// second try HOMEDRIVE + HOMEPATH (windows)
+	// second try HOMEDRIVE + HOMEPATH (windows)s
 	// otherwise try current working directory
 	if (str)
 	{
 		// use home directory
-		strcpy(home_dir, str);
+		strcpy (home_dir, str);
 
-		create_dir(parent);
-		strcat(home_dir, "/");
-		strcat(home_dir, parent);
+		create_dir (parent);
+		strcat (home_dir, "/");
+		strcat (home_dir, parent);
 	}
 	else
 	{
 		// use current directory
-		str = getcwd(NULL, 0);
+		str = getcwd (NULL, 0);
 		if (str)
 		{
-			strcpy(home_dir, str);
-			free(str);
+			strcpy (home_dir, str);
+			free (str);
 		}
 		else
 			// nothing will be saved
 			return;
 	}
 
-	create_dir("maps");
-	create_dir("screenshots");
-	create_dir("videos");
+	create_dir ("maps");
+	create_dir ("screenshots");
+	create_dir ("videos");
 }
+
 
 int path_writeable (char *path)
 {

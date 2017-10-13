@@ -41,13 +41,15 @@ DSPState dspstate;
 
 void dsp_mail_push (__u32 mail)
 {
-	*dspstate.mail_queue_top++ = mail;
+	dspstate.mail_queue[dspstate.mail_queue_top++] = mail;
 	
-	if (dspstate.mail_queue_top == &dspstate.mail_queue[MAIL_QUEUE_SIZE])
-		dspstate.mail_queue_top = dspstate.mail_queue;
+	if (dspstate.mail_queue_top == MAIL_QUEUE_SIZE)
+		dspstate.mail_queue_top = 0;
 
 	if (dspstate.mail_queue_top == dspstate.mail_queue_bottom)
 		DEBUG (EVENT_EFATAL, ".dsp: mail queue is too small (queue_top reached queue_bottom)");
+
+	DEBUG (EVENT_LOG_DSP, ".dsp: mail push %.8x", mail);
 }
 
 
@@ -59,10 +61,12 @@ __u32 dsp_mail_pop (void)
 	if (dspstate.mail_queue_bottom == dspstate.mail_queue_top)
 		mail = 0;
 	else
-		mail = *dspstate.mail_queue_bottom++;
+		mail = dspstate.mail_queue[dspstate.mail_queue_bottom++];
 	
-	if (dspstate.mail_queue_bottom == &dspstate.mail_queue[MAIL_QUEUE_SIZE])
-		dspstate.mail_queue_bottom = dspstate.mail_queue;
+	if (dspstate.mail_queue_bottom == MAIL_QUEUE_SIZE)
+		dspstate.mail_queue_bottom = 0;
+
+	DEBUG (EVENT_LOG_DSP, ".dsp: mail pop  %.8x", mail);
 
 	return mail;
 }
@@ -70,7 +74,7 @@ __u32 dsp_mail_pop (void)
 
 void dsp_mail_reset (void)
 {
-	dspstate.mail_queue_top = dspstate.mail_queue_bottom = dspstate.mail_queue;
+	dspstate.mail_queue_top = dspstate.mail_queue_bottom = 0;
 
 	dspstate.mail_valid = FALSE;
 	dspstate.mail_read = 0;
@@ -85,7 +89,7 @@ int dsp_mail_empty (void)
 
 void dsp_mail_init (void)
 {
-	dspstate.mail_queue_top = dspstate.mail_queue_bottom = dspstate.mail_queue;
+	dspstate.mail_queue_top = dspstate.mail_queue_bottom = 0;
 
 	dsp_mail_reset ();
 
@@ -112,11 +116,13 @@ void dsp_update (void)
 void dsp_send_mail (__u32 mail)
 {
 	static __u32 buff[256];
-	static int nparams = 0, step = 0, resume = FALSE;
+	static int nparams = 0, step = 0, resume = FALSE, babe_mail = FALSE;
 	static int test = FALSE;
 
 
 	dspstate.mail_valid = FALSE;
+
+	DEBUG (EVENT_LOG_DSP, ".dsp: got mail  %.8x", mail);
 
 	if (nparams == 0)
 	{
@@ -134,12 +140,28 @@ void dsp_send_mail (__u32 mail)
 			DEBUG (EVENT_LOG_DSP, ".dsp: mail -> 0xBABE %.4x", mail & 0xffff);
 			nparams = 1;
 			resume = TRUE;
+
+			babe_mail = TRUE;
 		}
 		else if ((mail >> 16) == 0xcdd1)
 		{
-			// 10 params incoming
-			nparams = 10;
-			test = TRUE;
+			// cdd10002/3
+			if (((mail & 0xffff) == 0x0003) || ((mail & 0xffff) == 0x0002))
+			{
+				nparams = 0;
+
+				// hmm, tom and jerry needs this too
+				// doesn't pop it up normally, but after loading a level
+				// it pops the mail and gets 0 otherwise, so its needed
+				// see how gcemu handles this exactly
+				dsp_mail_push (DSP_YIELD);
+			}
+			else
+			{
+				// 10 params incoming
+				nparams = 10;
+				test = TRUE;
+			}
 		}
 		else switch (mail & 0xffff)
 		{
@@ -189,9 +211,9 @@ void dsp_send_mail (__u32 mail)
 				buff[0] = mail;
 				nparams = -1;
 				break;
-			
+
 			default:
-				printf (".dsp: unknown mail %.8x\n", mail);
+				printf (".dsp: unknown mail %.8x %.4x\n", mail, mail & 0xffff);
 		}
 	}
 	else if (nparams < 0)
@@ -202,6 +224,7 @@ void dsp_send_mail (__u32 mail)
 			dspstate.booted = TRUE;
 			dsp_mail_reset ();
 			dsp_mail_push (DSP_INIT);
+			// this is needed
 			dsp_mail_push (DSP_RESUME);
 		}
 		nparams = 0;
@@ -221,7 +244,13 @@ void dsp_send_mail (__u32 mail)
 				return;
 			}
 
-			if (resume)
+			if (babe_mail)
+			{
+				babe_mail = FALSE;
+				dsp_mail_push (DSP_YIELD);
+//				dsp_mail_push (DSP_RESUME);
+			}
+			else if (resume)
 				dsp_mail_push (DSP_RESUME);
 			else
 			{
@@ -304,8 +333,8 @@ void ai_generate_interrupt (void)
 
 void ai_w32_cr (__u32 addr, __u32 data)
 {
-	DEBUG (EVENT_LOG_AI, "..ai: AICR | PSTAT %d | FREQ %d kHz | AIINT %d/%d | AIINTVLD %d | SCRESET %d",
-				 data & AICR_PSTAT, (data & AICR_AFR) ? 48 : 32, (data & AICR_AIINTMSK)>0, (data & AICR_AIINT)>0, (data & AICR_AIINTVLD)>0, (data & AICR_SCRESET)>0);
+	DEBUG (EVENT_LOG_AI, "..ai: AICR | PSTAT %d | FREQ %d kHz | AIINT %d/%d/%d | SCRESET %d | DSPRATE %d kHz",
+				 data & AICR_PSTAT, (data & AICR_AFR) ? 48 : 32, (data & AICR_AIINTMSK)>0, (data & AICR_AIINT)>0, (data & AICR_AIINTVLD)>0, (data & AICR_SCRESET)>0, (data & AICR_DSPRATE) ? 48 : 32);
 
 	if ((AICR & AICR_PSTAT) != (data & AICR_PSTAT))
 		DEBUG (EVENT_LOG_AI, "....  streaming %s", (data & AICR_PSTAT) ? "started" : "stopped");
@@ -319,8 +348,8 @@ void ai_w32_cr (__u32 addr, __u32 data)
 	if (data & AICR_AIINT)
 		RAI32 (addr) &= ~AICR_AIINT;
 
-	RAI32 (addr) = (RAI32 (addr) &~ (AICR_PSTAT | AICR_AFR | AICR_AIINTMSK | AICR_AIINTVLD)) |
-								 (data & (AICR_PSTAT | AICR_AFR | AICR_AIINTMSK | AICR_AIINTVLD));
+	RAI32 (addr) = (RAI32 (addr) &~ (AICR_PSTAT | AICR_AFR | AICR_AIINTMSK | AICR_AIINTVLD | AICR_DSPRATE)) |
+								 (data & (AICR_PSTAT | AICR_AFR | AICR_AIINTMSK | AICR_AIINTVLD | AICR_DSPRATE));
 
 	audio_set_freq ((AICR & AICR_AFR) ? FREQ_48KHZ : FREQ_32KHZ);
 	
@@ -479,6 +508,8 @@ void dsp_aram_transfer (void)
 			MEM_COPY_FROM_PTR (RDSP32 (ARDMA_MMADDR_H), ARAM_ADDRESS (RDSP32 (ARDMA_ARADDR_H)), size);
 			MEM_SET (RDSP32 (ARDMA_MMADDR_H) + size, 0x05, RDSP32 (ARDMA_CNT_H) - size);
 		}
+		else
+			DEBUG (EVENT_LOG_DSP, ".dsp: aram read out of bounds");
 	}
 	else
 	{
@@ -494,6 +525,8 @@ void dsp_aram_transfer (void)
 
 			MEM_COPY_TO_PTR (ARAM_ADDRESS (RDSP32 (ARDMA_ARADDR_H)), RDSP32 (ARDMA_MMADDR_H), size);
 		}
+		else
+			DEBUG (EVENT_LOG_DSP, ".dsp: aram write out of bounds");
 	}
 
 	RDSP32 (ARDMA_CNT_H) = 0;
@@ -563,7 +596,7 @@ void dsp_init (void)
 	// ARAM ready?
 	RDSP16 (0x5016) = 1;
 	mem_hwr_hook (16, 0x5016, dsp_r16_direct);
-	
+
 	mem_hwr_hook (32, ARDMA_MMADDR_H, dsp_r32_direct);
 	mem_hww_hook (32, ARDMA_MMADDR_H, dsp_w32_direct);
 	mem_hwr_hook (16, ARDMA_MMADDR_H, dsp_r16_direct);
@@ -602,13 +635,14 @@ void dsp_init (void)
 
 	memset (rai, 0, sizeof (rai));
 
-
+	// sampling rate
 	AICR |= AICR_AFR;
+	AICR |= AICR_DSPRATE;
 
 	// ai control register
 	mem_hwr_hook (32, AI_AICR, ai_r32_direct);
 	mem_hww_hook (32, AI_AICR, ai_w32_cr);
-	
+
 	// volume
 	mem_hwr_hook (32, AI_VR, ai_r32_direct);
 	mem_hww_hook (32, AI_VR, ai_w32_aivr);

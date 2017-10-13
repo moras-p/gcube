@@ -74,8 +74,37 @@ __u32 pi_r32_wpointer (__u32 addr)
 }
 
 
+int delayed_ints[16] = {-1};
+
+void delayed_interrupt_set (int num, int delay)
+{
+	if (delayed_ints[num] > 0)
+	{
+			INTSR |= INTERRUPT_DI;
+			pi_check_for_interrupts ();
+	}
+
+	delayed_ints[num] = delay;
+}
+
+
+void delayed_interrupt_check (void)
+{
+	// only INTERRUPT_DI
+	if (delayed_ints[2] > 0)
+	{
+		if (!--delayed_ints[2])
+		{
+			delayed_ints[2] = -1;
+			INTSR |= INTERRUPT_DI;
+		}
+	}
+}
+
+
 void pi_check_for_interrupts (void)
 {
+	delayed_interrupt_check ();
 	if ((INTSR & INTMR) && (MSR & MSR_EE))
 	{
 		DEBUG (EVENT_LOG_INT, "INT: ");
@@ -86,6 +115,12 @@ void pi_check_for_interrupts (void)
 
 void pi_interrupt (__u32 mask, int set)
 {
+	if (set && (mask == INTERRUPT_DI))
+	{
+		delayed_interrupt_set (2, 2000);
+		return;
+	}
+
 	if (set)
 		INTSR |= mask;
 	else

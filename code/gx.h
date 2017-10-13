@@ -3,6 +3,8 @@
 
 
 void gx_set_max_anisotropy (float a);
+int gx_get_real_width (void);
+int gx_get_real_height (void);
 void gx_set_texture_mode0 (int index);
 void gx_set_texture_mode1 (int index);
 void gx_set_projection (void);

@@ -117,3 +117,58 @@ void jpeg_decompress (__u8 *src, __u32 size, char *dst, int pitch)
 
 	jpeg_destroy_decompress (&cinfo);
 }
+
+
+struct jpeg_decompress_struct cinfo;
+struct jpeg_error_mgr jerr;
+void jpeg_decompress_start (__u8 *src, __u32 size)
+{
+	cinfo.err = jpeg_std_error (&jerr);
+	jpeg_create_decompress (&cinfo);
+
+	jpeg_memory_src (&cinfo, src, size);
+	jpeg_read_header (&cinfo, FALSE);
+}
+
+
+void jpeg_memory_src_reset (j_decompress_ptr cinfo, __u8 *buff, __u32 size)
+{
+	struct jpeg_source_mgr *smgr;
+
+
+	smgr = &((my_source_mgr *) cinfo->src)->pub;
+
+	smgr->next_input_byte = buff;
+	smgr->bytes_in_buffer = size;
+}
+
+
+void jpeg_decompress_continue (__u8 *src, __u32 size, char *dst, int pitch, int color_space)
+{
+	JSAMPROW row[1];
+	J_COLOR_SPACE cspace[] =
+	{
+		JCS_GRAYSCALE, JCS_RGB, JCS_YCbCr,
+	};
+
+	jpeg_memory_src_reset (&cinfo, src, size);
+	jpeg_read_header (&cinfo, TRUE);
+
+	cinfo.out_color_space = cspace[color_space];
+
+#if 1
+// for faster loading
+	cinfo.dct_method = JDCT_FASTEST;
+	cinfo.do_fancy_upsampling = FALSE;
+	cinfo.do_block_smoothing = FALSE;
+#endif
+
+
+	jpeg_start_decompress (&cinfo);
+	while (cinfo.output_scanline < cinfo.output_height)
+	{
+		row[0] = (JSAMPROW) ((void *) dst + cinfo.output_scanline * pitch);
+		jpeg_read_scanlines (&cinfo, row, 1);
+	}
+	jpeg_finish_decompress (&cinfo);
+}

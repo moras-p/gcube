@@ -84,7 +84,7 @@ HLE (SIProbe)
 
 const char *movie_ext[] =
 {
-	"thp", "h4m", "str",
+	"thp", "h4m", "str", "bik",
 };
 
 
@@ -96,7 +96,7 @@ int is_movie_file (const char *name)
 
 	if (len > 4)
 		for (i = 0; i < sizeof (movie_ext) / sizeof (*movie_ext); i++)
-			if (0 == strcmp (movie_ext[i], &name[len - 3]))
+			if (0 == strcasecmp (movie_ext[i], &name[len - 3]))
 				return TRUE;
 	
 	return FALSE;
@@ -115,7 +115,7 @@ HLE (DVDOpen_ignore_movies)
 HLE (DVDConvertPathToEntrynum_ignore_movies)
 {
 	if (is_movie_file (HLE_PARAM_1_PTR))
-		HLE_RETURN (0);
+		HLE_RETURN (-1);
 
 	HLE_EXECUTE_LLE;
 }

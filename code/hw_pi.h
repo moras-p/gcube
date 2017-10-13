@@ -45,6 +45,7 @@ extern __u8 rpi[RPI_SIZE];
 #define PI_FIFO_END					(RPI32 (PI_FIFO_END_P))
 #define PI_FIFO_WPOINTER		(RPI32 (PI_FIFO_WPOINTER_P))
 
+#define PI_WRPTR_WRAP				(1 << 26)
 
 void pi_init (void);
 void pi_reinit (void);

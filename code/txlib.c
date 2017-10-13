@@ -134,6 +134,19 @@ int screen_getkey (Screen *screen)
 	return getch ();
 }
 
+
+int screen_getkeyhit (Screen *screen)
+{
+	int key;
+
+
+	nodelay (stdscr, TRUE);
+	key = getch ();
+	nodelay (stdscr, FALSE);
+	return key;
+}
+
+
 int attributes (int color, int attribs)
 {
 	return COLOR_ATTRIB (color) | attribs;
@@ -989,6 +1002,7 @@ int screen_handle_input (Screen *screen, int key)
 		// ordinary tab
 		case 0x09:
 			screen_select_window (screen, SELECT_NEXT);
+			screen_refresh (screen);
 			return TRUE;
 		
 		// tilde

@@ -120,6 +120,27 @@
     <ClInclude Include="external\scandir\scandir.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="code\dsp_disassemble.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\dsp_opcodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\dsp_types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\gl_ext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\ppc_disasm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\scandir.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\timer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="code\audio_sdl.c">
@@ -237,6 +258,27 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="external\ppc_disasm\ppc_disasm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\dsp_disassemble.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\dsp_opcodes.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\gl_ext.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\gl_ext_.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\ppc_disasm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\scandir.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\timer_sdl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -9,11 +9,6 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#ifdef WINDOWS
-# include <io.h>
-#else
-# include <sys/io.h>
-#endif
 
 #include "types.h"
 
@@ -36,6 +31,9 @@
 # include "tools_c.h"
 #endif
 
+#ifdef NEED_SCANDIR
+# include "scandir.h"
+#endif
 
 #define MAX_S32			((__s32) 0x7fffffff)
 #define MIN_S32			((__s32) 0x80000000)
@@ -88,14 +86,13 @@ char *get_home_dir (void);
 
 __u32 round_up (__u32 a, __u32 b);
 inline int is_power_of_two (__u32 a);
+int closest_upper_power_of_two (__u32 a);
 
 __u32 crc_setup (unsigned int bits);
 __u32 crc_iterate (__u32 crc, __u8 d);
 
 void create_dir (char *name);
 void create_dir_tree (char *parent);
-
-//int mkdir (const char *pathname, int mode);
 
 int path_writeable (char *path);
 

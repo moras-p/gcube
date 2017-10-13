@@ -25,6 +25,18 @@
 #include "diskio.h"
 #include "mem.h"
 
+ // gzseek is buggy on windows, need to call gzrewind first
+z_off_t my_gzseek(gzFile file, z_off_t offset, int whence)
+{
+	if (whence == SEEK_CUR)
+		offset += gztell(file);
+
+	gzrewind(file);
+	return gzseek(file, offset, whence);
+}
+#ifdef WINDOWS
+#define gzseek my_gzseek
+#endif
 
 int gzseekend (gzFile *file)
 {
@@ -78,6 +90,7 @@ void imp_close (IMPFile *file)
 		free (a);
 		a = b;
 	}
+	free (file);
 }
 
 
@@ -214,85 +227,80 @@ int imp_read (IMPFile *file, char *buff, unsigned int size)
 
 
 // read-only binary files
-File *file_open(char *filename)
+File *file_open (char *filename)
 {
 	File *file;
 
 
-	if (!file_exists(filename))
+	if (!file_exists (filename))
 		return NULL;
 
 
-	file = (File *)calloc(1, sizeof(File));
-	file->filename = strdup(filename);
+	file = calloc (1, sizeof (File));
+	file->filename = strdup (filename);
 
-	if (is_imp(filename))
+	if (is_imp (filename))
 	{
-		file->f = imp_open(filename);
+		file->f = imp_open (filename);
 		file->type = FILE_IMP;
 	}
 	else
-		//file->f = gzopen (filename, "rb");
-		file->f = fopen(filename, "rb");
+		file->f = gzopen (filename, "rb");
 
 	return file;
 }
 
 
-void file_close(File *file)
+void file_close (File *file)
 {
 	if (file->type == FILE_IMP)
-		imp_close((IMPFile *)file->f);
+		imp_close (file->f);
 	else
-		//gzclose (file->f);
-		fclose(file->f);
+		gzclose (file->f);
 
-	free(file->filename);
-	free(file);
+	free (file->filename);
+	free (file);
 }
 
 
-int file_seek(File *file, int offset, int whence)
+int file_seek (File *file, int offset, int whence)
 {
 	if (file->type == FILE_IMP)
-		return imp_seek((IMPFile *)file->f, offset, whence);
+		return imp_seek (file->f, offset, whence);
 	else
 	{
 		if (whence == SEEK_END)
-			return gzseekend((gzFile *)file->f);
+			return gzseekend (file->f);
 		else
-			//return gzseek (file->f, offset, whence);
-			return fseek(file->f, offset, whence);
+			return gzseek (file->f, offset, whence);
 	}
 }
 
 
-int file_tell(File *file)
+int file_tell (File *file)
 {
 	if (file->type == FILE_IMP)
-		return imp_tell((IMPFile *)file->f);
+		return imp_tell (file->f);
 	else
-		//return gztell (file->f);
-		return ftell(file->f);
+		return gztell (file->f);
 }
 
 
-int file_read(File *file, void *buff, unsigned int size)
+int file_read (File *file, void *buff, unsigned int size)
 {
 	if (file->type == FILE_IMP)
-		return imp_read((IMPFile *)file->f, (char *)buff, size);
+		return imp_read (file->f, buff, size);
 	else
-		//return gzread (file->f, buff, size);
-		return fread(buff, 1, size, file->f);
+		return gzread (file->f, buff, size);
 }
 
 
-__u32 file_read_w(File *file)
+__u32 file_read_w (File *file)
 {
 	__u32 w = 0;
 
 
-	file_read(file, &w, 4);
+	file_read (file, &w, 4);
 	return w;
 }
 
@@ -637,9 +645,9 @@ void save_state (char *filename, int compressed)
 	// auxiliary ram
 	gcswrite (gcs, ARAM_ADDRESS (0), hdr.aram_size, compressed, FALSE);
 	// cpu
-	gcswrite (gcs, regs, hdr.regs_size, compressed, FALSE);
-	gcswrite (gcs, ps0, hdr.ps0regs_size, compressed, FALSE);
-	gcswrite (gcs, ps1, hdr.ps1regs_size, compressed, FALSE);
+	gcswrite (gcs, &CPUREGS (0), hdr.regs_size, compressed, FALSE);
+	gcswrite (gcs, &FPUREGS_PS0 (0), hdr.ps0regs_size, compressed, FALSE);
+	gcswrite (gcs, &FPUREGS_PS1 (0), hdr.ps1regs_size, compressed, FALSE);
 	// hw
 	gcswrite (gcs, rdsp, hdr.dspregs_size, compressed, TRUE);
 	gcswrite (gcs, rai, hdr.airegs_size, compressed, TRUE);
@@ -691,11 +699,11 @@ __u32 load_state (char *filename)
 	gcsread (gf, ARAM_ADDRESS (0), hdr.aram_size, FALSE);
 	// cpu
 	gzseek (gf, hdr.regs_offset, SEEK_SET);
-	gcsread (gf, regs, hdr.regs_size, FALSE);
+	gcsread (gf, &CPUREGS (0), hdr.regs_size, FALSE);
 	gzseek (gf, hdr.ps0regs_offset, SEEK_SET);
-	gcsread (gf, ps0, hdr.ps0regs_size, FALSE);
+	gcsread (gf, &FPUREGS_PS0 (0), hdr.ps0regs_size, FALSE);
 	gzseek (gf, hdr.ps1regs_offset, SEEK_SET);
-	gcsread (gf, ps1, hdr.ps1regs_size, FALSE);
+	gcsread (gf, &FPUREGS_PS1 (0), hdr.ps1regs_size, FALSE);
 	// hw
 	gzseek (gf, hdr.dspregs_offset, SEEK_SET);
 	gcsread (gf, rdsp, hdr.dspregs_size, TRUE);

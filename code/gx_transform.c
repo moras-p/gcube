@@ -5759,7 +5759,7 @@ inline void calc_color (float outcolor[4], float incolor[4], int chn, float pos[
 // incorrect, only few effects work right
 void tex_gen (GXTFVertex *v, int s, float pos[3])
 {
-	int n = TS_COORD (s);
+	int n = TS_TEXCOORD (s);
 	int row = TC_SOURCE_ROW (n);
 	float t[3], out[3];
 

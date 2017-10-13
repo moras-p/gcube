@@ -37,6 +37,7 @@
 #define GCUBE_RUN					0x010
 #define GCUBE_RUNNING			0x020
 #define GCUBE_EXIT				0x040
+#define GDEBUG_OPENED			0x080
 #define EMU_EXIT					0x100
 
 #define CONSOLE_CURSOR_OFFSET			10
@@ -55,8 +56,9 @@
 #define VAR_INTSR				0
 #define VAR_INTMR				1
 
+#define OUT_MAX_BLOCK_REPEAT			500
 
-#define CODE_WINDOW_NMODES				2
+#define CODE_WINDOW_NMODES				3
 
 #define REGS_MODE_GPR							0
 #define REGS_MODE_FPR							1
@@ -105,7 +107,6 @@ typedef struct
 	int nitems;
 	int visitems;
 	int pos;
-	
 	int nfirst_item;
 } OutputWin;
 
@@ -167,6 +168,7 @@ typedef struct
 
 	__u32 mem_address;
 	__u32 code_address;
+	__u32 dspcode_address;
 
 	int initialized;
 	unsigned int mem_lines, code_lines, output_lines;

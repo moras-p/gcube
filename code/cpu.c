@@ -27,7 +27,7 @@
 
 
 // registers
-__u32 regs[4096];
+__u32 cpuregs[4096];
 __u64 ps0[32], ps1[32];
 
 // opcodes
@@ -40,10 +40,6 @@ void (*op63[2048]) (__u32);
 
 // precalculated masks
 __u32 mask[32][32];
-
-// for lwarx and stwcx.
-int RESERVE = 0;
-__u32 RESERVE_ADDR = 0;
 
 double (*fp_round[]) (double) = { round, trunc, ceil, floor };
 #define FP_ROUND(D)		(fp_round[FPSCR_RN] (D))
@@ -62,6 +58,152 @@ int fp_round_mode[] = { FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD, FE_DOWNWARD };
 	if (!(MSR & MSR_FP)) return cpu_exception_dont_advance (EXCEPTION_FP_UNAVAILABLE);\
 })
 
+
+// for lwarx and stwcx.
+//int RESERVE = 0;
+//__u32 RESERVE_ADDR = 0;
+// use some unused cpu regs so they will get written into savestates
+#define CPUREGS_PRIV			512
+#define RESERVE 					(CPUREGS (CPUREGS_PRIV + 0))
+#define RESERVE_ADDR			(CPUREGS (CPUREGS_PRIV + 1))
+
+//////////////////////////////////////////////////////////////////////////////
+// fix and clean this up
+#define refresh_delay			(CPUREGS (CPUREGS_PRIV + 2))
+#define pe_refresh				(CPUREGS (CPUREGS_PRIV + 3))
+#define vcount						(CPUREGS (CPUREGS_PRIV + 4))
+#define do_postretrace		(CPUREGS (CPUREGS_PRIV + 5))
+#define retrace_count			(CPUREGS (CPUREGS_PRIV + 6))
+#define fifo_count				(CPUREGS (CPUREGS_PRIV + 7))
+#define audio_count				(CPUREGS (CPUREGS_PRIV + 8))
+#define AUDIO_COUNT 			0x2ffff
+#define FIFO_COUNT 				0xaffff
+#define RETRACE_COUNT 		0xfffff
+
+int ref_delay = 110000;
+
+
+void zero_state (void)
+{
+	refresh_delay = 640*480*3;
+	retrace_count = RETRACE_COUNT;
+	fifo_count = FIFO_COUNT;
+	audio_count = AUDIO_COUNT;
+}
+
+
+void gcube_perf_vertices (int count)
+{
+	vcount += count;
+}
+
+
+void gcube_pe_refresh (void)
+{
+	pe_refresh = TRUE;
+
+	// refresh only if something was drawn
+	if (vcount)
+	{
+		refresh_delay = ref_delay;
+
+		vcount = 0;
+		video_refresh_nofb ();
+	}
+	else
+		video_input_check ();
+}
+
+
+void force_refresh (void)
+{
+	IC = refresh_delay;
+}
+
+
+void do_refresh (void)
+{
+	if (IC > refresh_delay)
+	{
+		IC = 0;
+		vi_refresh ();
+		if (!pe_refresh)
+			video_refresh ();
+	}
+}
+
+
+void (*vid_refresh) (void) = do_refresh;
+
+
+void refresh_manual (void)
+{
+	if (IC > 640*480*30)
+	{
+		refresh_delay = 640*480*5;
+		vid_refresh = do_refresh;
+	}
+}
+
+
+void gcube_refresh_manual (void)
+{
+	vid_refresh = refresh_manual;
+	// don't call vi interrupt too often
+	if (IC > 0xfff)
+	{
+		IC = 0;
+
+		if (!pe_refresh)
+			video_refresh ();
+
+		vi_refresh ();
+	}
+}
+
+
+void do_stuff (void)
+{
+		if (!audio_count--)
+		{
+			audio_count = AUDIO_COUNT;
+			dsp_generate_interrupt (DSP_INTERRUPT_AID);
+		}
+		
+		if (!fifo_count--)
+		{
+			fifo_count = FIFO_COUNT;
+
+			video_input_check ();
+			si_update_devices ();
+			dsp_update ();
+		}
+
+#if 0
+		if (!retrace_count--)
+		{
+			retrace_count = RETRACE_COUNT;
+# if 1
+			if (do_postretrace)
+			{
+				video_postretrace ();
+				do_postretrace = FALSE;
+			}
+			else
+			{
+				video_preretrace ();
+				do_postretrace = TRUE;
+			}
+# else
+			video_preretrace ();
+# endif
+		}
+#else
+	vid_refresh ();
+#endif
+}
+
+//////////////////////////////////////////////////////////////////////////////
 
 
 void cpu_exception (__u32 ex)
@@ -107,121 +249,6 @@ void decrementer_tick (void)
 }
 
 
-__u32 refresh_delay = 640*480*3;
-int pe_refresh = FALSE;
-int vcount = 0;
-int ref_delay = 110000;
-int do_preretrace = TRUE;
-
-void gcube_perf_vertices (int count)
-{
-	vcount += count;
-}
-
-
-void gcube_pe_refresh (void)
-{
-	pe_refresh = TRUE;
-
-	// refresh only if something was drawn
-	if (vcount)
-	{
-		refresh_delay = ref_delay;
-
-		vcount = 0;
-		video_refresh_nofb ();
-	}
-	else
-		video_input_check ();
-}
-
-
-void do_refresh (void)
-{
-	if (IC > refresh_delay)
-	{
-		IC = 0;
-		vi_refresh ();
-		if (!pe_refresh)
-			video_refresh ();
-	}
-}
-void (*vid_refresh) (void) = do_refresh;
-
-
-void refresh_manual (void)
-{
-	if (IC > 640*480*30)
-	{
-		refresh_delay = 640*480*5;
-		vid_refresh = do_refresh;
-	}
-}
-
-
-void gcube_refresh_manual (void)
-{
-	vid_refresh = refresh_manual;
-	// don't call vi interrupt too often
-	if (IC > 0xfff)
-	{
-		IC = 0;
-
-		if (!pe_refresh)
-			video_refresh ();
-
-		vi_refresh ();
-	}
-}
-
-#define AUDIO_COUNT 0x2ffff
-#define FIFO_COUNT 0xaffff
-#define RETRACE_COUNT 0xfffff
-static __u32 retrace_count = RETRACE_COUNT;
-static __u32 fifo_count = FIFO_COUNT;
-static __u32 audio_count = AUDIO_COUNT;
-void do_stuff (void)
-{
-		if (!audio_count--)
-		{
-			audio_count = AUDIO_COUNT;
-			dsp_generate_interrupt (DSP_INTERRUPT_AID);
-		}
-		
-		if (!fifo_count--)
-		{
-			fifo_count = FIFO_COUNT;
-
-			video_input_check ();
-			si_update_devices ();
-			dsp_update ();
-		}
-
-#if 0
-		if (!retrace_count--)
-		{
-			retrace_count = RETRACE_COUNT;
-# if 1
-			if (do_preretrace)
-			{
-				video_preretrace ();
-				do_preretrace = FALSE;
-			}
-			else
-			{
-				video_postretrace ();
-				do_preretrace = TRUE;
-			}
-# else
-			video_preretrace ();
-# endif
-		}
-#else
-	vid_refresh ();
-#endif
-}
-
-
 void cpu_execute (void)
 {
 	__u32 opcode;
@@ -233,6 +260,8 @@ void cpu_execute (void)
 	decrementer_tick ();
 
 	do_stuff ();
+	
+	pi_check_for_interrupts ();
 
 	IC++;
 	PC += 4;
@@ -1432,7 +1461,7 @@ OPCODE (MTMSR)
 {
 	MSR = RRS;
 
-	pi_check_for_interrupts ();
+//	pi_check_for_interrupts ();
 }
 
 
@@ -1551,7 +1580,7 @@ OPCODE (MTSPR)
 		
 		// MSR
 		case 49:
-			pi_check_for_interrupts ();
+//			pi_check_for_interrupts ();
 			break;
 		
 		default:
@@ -1776,7 +1805,7 @@ OPCODE (RFI)
 	CLEAR_BIT (MSR, 13);
 	PC = (SRR0 &~ 3) - 4;
 	
-	pi_check_for_interrupts ();
+//	pi_check_for_interrupts ();
 }
 
 
@@ -3755,11 +3784,13 @@ void cpu_init (void)
 	int i, j;
 
 
-	memset (regs, 0, sizeof (regs));
+	memset (cpuregs, 0, sizeof (cpuregs));
 	memset (ps0, 0, sizeof (ps0));
 	memset (ps1, 0, sizeof (ps1));
 
-	SP = 0x816ffff0;
+	zero_state ();
+
+	RSP = 0x816ffff0;
 	LR = EXCEPTION_SYSTEM_RESET;
 	MSR = MSR_FP;
 
@@ -3930,7 +3961,7 @@ void cpu_init (void)
 	OP4 (31,  0, 266, 1) = ADDD;
 	OP4 (31,  1, 266, 0) = ADDO;
 	OP4 (31,  1, 266, 1) = ADDOD;
-	OP3 (31,     247, 0) = STBUX;
+	OP3 (31,     274, 0) = STBUX;
 	OP3 (31,     278, 0) =  EMPTY;		// DCBT - data cache block touch
 	OP3 (31,     279, 0) = LHZX;
 	OP3 (31,     284, 0) = EQV;

@@ -8,8 +8,10 @@
 #define RDSP_SIZE					0x200
 #define RDSP_MASK					0x1ff
 
-#define ARAM_SIZE					0x02000000
-#define	ARAM_MASK					0x01ffffff
+//#define ARAM_SIZE					0x02000000
+//#define ARAM_MASK					0x01ffffff
+#define ARAM_SIZE					0x01000000
+#define	ARAM_MASK					0x00ffffff
 
 #define ARAM_ADDRESS(X)		(&ARAM [X])
 
@@ -52,6 +54,7 @@ extern __u8 ARAM[ARAM_SIZE];
 
 #define AI_AICR							0x6c00
 #define AICR								(RAI32 (AI_AICR))
+#define AICR_DSPRATE				(1 << 6)
 #define AICR_SCRESET				(1 << 5)
 #define AICR_AIINTVLD				(1 << 4)
 #define AICR_AIINT					(1 << 3)
@@ -103,7 +106,7 @@ extern __u8 ARAM[ARAM_SIZE];
 #define DSP_INTERRUPT_AR			(1 << 1)
 #define DSP_INTERRUPT_AID			(1 << 2)
 
-#define MAIL_QUEUE_SIZE				1024
+#define MAIL_QUEUE_SIZE				(1024*1000)
 
 typedef struct
 {
@@ -111,7 +114,7 @@ typedef struct
 	__u32 mail_read;
 	int booted;
 	__u32 mail_queue[MAIL_QUEUE_SIZE];
-	__u32 *mail_queue_top, *mail_queue_bottom;
+	int mail_queue_top, mail_queue_bottom;
 } DSPState;
 
 extern DSPState dspstate;

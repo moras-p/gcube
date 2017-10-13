@@ -49,10 +49,10 @@ ENABLE_SOUND=0
 MMU_ENABLED=0
 
 # build tools
-MAKE_TOOLS=0
+MAKE_TOOLS=1
 
 # don't touch
-ADDS_OBJ=res.o scandir.o
+ADDS_OBJ=res.o scandir.o gl_ext.o
 WINDOWS=1
 
 include Makefile.rules

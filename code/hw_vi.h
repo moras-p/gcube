@@ -11,9 +11,11 @@
 
 // reversed addressing space
 #ifdef LIL_ENDIAN
+# define RVI8(X)			(*((__u8  *) &rvi[RVI_SIZE - ((X) & RVI_MASK) - 1]))
 # define RVI16(X)			(*((__u16 *) &rvi[RVI_SIZE - ((X) & RVI_MASK) - 2]))
 # define RVI32(X)			(*((__u32 *) &rvi[RVI_SIZE - ((X) & RVI_MASK) - 4]))
 #else
+# define RVI8(X)			(*((__u8  *) &rvi[(X) & RVI_MASK]))
 # define RVI16(X)			(*((__u16 *) &rvi[(X) & RVI_MASK]))
 # define RVI32(X)			(*((__u32 *) &rvi[(X) & RVI_MASK]))
 #endif

@@ -550,6 +550,7 @@ void gx_init (void)
 
 	memset (&texcache, 0, sizeof (texcache));
 //	memset (&gxswitches, 0, sizeof (gxswitches));
+	gxswitches.new_engine = TRUE;
 
 	for (i = 0; i < 0x100; i++)
 		GPOP (i) = INVALID;

@@ -191,6 +191,10 @@ void di_execute_command (void)
 		case 0xe4010000:
 			DEBUG (EVENT_LOG_DI, "....  CMD dvd audio enable");
 			break;
+		
+		default:
+			DEBUG (EVENT_LOG_DI, "....  CMD unknown command (%.8x)", RDI32 (DI_CMDBUF0));
+			break;
 	}
 /*
 	if (RDI32 (DI_CR) & DICR_DMA)

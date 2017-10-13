@@ -25,7 +25,7 @@
 #include "hw_gx.h"
 #include <SDL/SDL_opengl.h>
 
-
+#include "gl_ext.h"
 
 TextureCache texcache;
 TextureTag *texactive[8] = {0};
@@ -811,6 +811,12 @@ void (*texconvert[]) (__u8 *src, int width, int height, __u16 *tlut, int format,
 
 void gx_enable_texture (unsigned int index, int enable)
 {
+#ifdef NO_GL_EXT
+	if (index != 0)
+		return;
+#else
+	glActiveTextureARB (GL_TEXTURE0_ARB + index);
+#endif
 	switch (enable)
 	{
 		case TEX_DISABLED:
@@ -842,6 +848,14 @@ void gx_enable_texture (unsigned int index, int enable)
 			texenabled[index] = TEX_ENABLED;
 			break;
 	}
+}
+
+
+void gx_bind_texture (unsigned int index, TextureTag *tag)
+{
+	texactive[index] = tag;
+	if (tag)
+		glBindTexture (tag->type, tag->tex);
 }
 
 
@@ -1001,7 +1015,8 @@ void texcache_tag_validate (TextureTag *tag)
 
 void texcache_tag_invalidate (TextureTag *tag)
 {
-	MEM32 (tag->marker_address) = tag->marker_save;
+	if (texcache_tag_valid (tag))
+		MEM32 (tag->marker_address) = tag->marker_save;
 }
 
 
@@ -1020,8 +1035,7 @@ void texcache_remove_tag (TextureTag *tag)
 	glDeleteTextures (1, &tag->tex);
 	texcache.memory_used -= tag->size;	
 
-	if (texcache_tag_valid (tag))
-		texcache_tag_invalidate (tag);
+	texcache_tag_invalidate (tag);
 
 	// copy last cache entry overwriting this one
 	if (tag != &texcache.tags[texcache.ntags - 1])
@@ -1168,16 +1182,30 @@ void gx_load_texture (unsigned int index)
 	int i;
 
 
+	// non power of two textures should only be able to use GX_WRAP
+	// but it seems it is not so (Paper Mario RPG)
+	if ((TEX_MODE_WRAP_S (index) != 0) || (TEX_MODE_WRAP_T (index) != 0))
+	{
+		DEBUG (EVENT_LOG_GX, "....  NP2 texture uses invalid wrap mode!");
+		// only possible with p2 textures
+		// enlarge the texture. there will be trash on new textures.
+		// hopefully, it won't be displayed
+		if (!is_power_of_two (width))
+			width = closest_upper_power_of_two (width);
+
+		if (!is_power_of_two (height))
+			height = closest_upper_power_of_two (height);
+	}
+
 	if (MEM32 (address) == XFB_MAGIC)
 	{
 #if 1
 		gx_enable_texture (index, tag_render_target.type);
-		texactive[index] = &tag_render_target;
-		glBindTexture (tag_render_target.type, tag_render_target.tex);
+		gx_bind_texture (index, &tag_render_target);
 #else
 		// don't use render target
 		gx_enable_texture (index, 0);
-		texactive[index] = NULL;
+		gx_bind_texture (index, NULL);
 #endif
 		return;
 	}
@@ -1201,10 +1229,7 @@ void gx_load_texture (unsigned int index)
 	
 		gx_enable_texture (index, tag->type);
 		if (tag != texactive[index])
-		{
-			glBindTexture (tag->type, tag->tex);
-			texactive[index] = tag;
-		}
+			gx_bind_texture (index, tag);
 
 		gx_set_texture_mode0 (index);
 		gx_set_texture_mode1 (index);
@@ -1218,9 +1243,8 @@ void gx_load_texture (unsigned int index)
 		
 		if (tag->reload)
 		{
-			if (texcache_tag_valid (tag))
-			// tlut was changed, but texture is still the same
-				texcache_tag_invalidate (tag);
+			// if tag valid -> tlut was changed, but texture is still the same
+			texcache_tag_invalidate (tag);
 
 			// convert base image
 			texconvert[format] (MEM_ADDRESS (address),
@@ -1289,9 +1313,8 @@ void gx_load_texture (unsigned int index)
 											tlut_format,
 											&tf);
 	// load texture
-	gx_enable_texture (0, type);
+	gx_enable_texture (index, type);
 	glGenTextures (1, &tex);
-	glBindTexture (type, tex);
 
 	// add tag
 	texactive[index] = texcache_add_tag (address, tlut_address, tex, type,
@@ -1300,6 +1323,8 @@ void gx_load_texture (unsigned int index)
 																			 TEX_IS_MIPMAPPED (index),
 																			 (int) min_lod, (int) max_lod,
 																			 TEX_EVEN_TMEM (index));
+
+	gx_bind_texture (index, texactive[index]);
 
 	gx_set_texture_mode0 (index);
 	gx_set_texture_mode1 (index);

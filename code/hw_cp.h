@@ -75,11 +75,15 @@ extern __u8 rcp[RCP_SIZE];
 #define CP_CLEAR_UF					(1 << 1)
 #define CP_CLEAR_OF					(1 << 0)
 
+#define CP_INTERRUPT_BP			(1 << 0)
+#define CP_INTERRUPT_UF			(1 << 1)
+#define CP_INTERRUPT_OF			(1 << 2)
 
 void cp_init (void);
 void cp_reinit (void);
 
-void cp_wpar_redirect (__u32 address);
+void cp_generate_interrupt (__u32 mask);
 
+void cp_wpar_redirect (__u32 address);
 
 #endif // __HW_CP_H

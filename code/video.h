@@ -32,7 +32,8 @@ int input_gamepads_connected (void);
 void video_set_fullscreen (int fs);
 void video_input_check (void);
 
-int save_tga (char *filename, __u32 *data, int w, int h, int invert);
+int save_tga (char *filename, __u32 *data, int w, int h, int invert, int convert);
+int save_tga_fast (char *filename, __u8 *data, int w, int h);
 
 
 #endif // __VIDEO_H

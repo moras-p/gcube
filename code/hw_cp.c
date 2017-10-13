@@ -30,6 +30,30 @@ __u8 rcp[RCP_SIZE];
 __u32 wpar_address = 0;
 
 
+void cp_update_interrupts (void)
+{
+	pi_interrupt (INTERRUPT_CP,
+			((CPSR & CP_SR_BPINT) && (CPCR & CP_CR_BPINTMSK)) ||
+			((CPSR & CP_SR_UFINT) && (CPCR & CP_CR_UFINTMSK)) ||
+			((CPSR & CP_SR_OFINT) && (CPCR & CP_CR_OFINTMSK)));
+}
+
+
+void cp_generate_interrupt (__u32 mask)
+{
+	if (mask & CP_INTERRUPT_BP)
+		CPSR |= CP_SR_BPINT;
+	
+	if (mask & CP_INTERRUPT_UF)
+		CPSR |= CP_SR_UFINT;
+	
+	if (mask & CP_INTERRUPT_OF)
+		CPSR |= CP_SR_OFINT;
+	
+	cp_update_interrupts ();
+}
+
+
 __u16 cp_r16_direct (__u32 addr)
 {
 	DEBUG (EVENT_LOG_CP, "..cp: read  [%.4x] (%.4x)", addr & 0xffff, RCP16 (addr));

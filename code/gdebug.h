@@ -2,7 +2,7 @@
 #define __GDEBUG_H 1
 
 
-#define GCUBE_VERSION			"0.4"
+#define GCUBE_VERSION			"0.5"
 #define GCUBE_DESCRIPTION	("gcube v" GCUBE_VERSION)
 
 #ifdef GDEBUG
@@ -35,6 +35,7 @@
 #define EVENT_LOG_GX			411
 #define EVENT_LOG_GX_IMM	412
 #define EVENT_LOG_CALLS		413
+#define EVENT_LOG_DUMMY		999
 
 
 #define DEBUG										gdebug_event
@@ -49,8 +50,6 @@ void gdebug_hw_write (__u32 addr);
 #else
 
 #define DEBUG(X,format,...)			({})
-#define DEBUG_READ(X)						({})
-#define DEBUG_WRITE(X)						({})
 #define gdebug_print_intmask(mask,msg)		{}
 
 #endif // GDEBUG

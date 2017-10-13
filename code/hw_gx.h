@@ -48,6 +48,8 @@
 #define VCD_TEX1											((CP_VCD_HI >>  2) & 3)
 #define VCD_TEX0											((CP_VCD_HI >>  0) & 3)
 
+#define VCD_TEX(n)										((CP_VCD_HI >> (n*2)) & 3)
+
 #define VCD_T7MIDX										(CP_VCD_LO & 0x100)
 #define VCD_T6MIDX										(CP_VCD_LO & 0x080)
 #define VCD_T5MIDX										(CP_VCD_LO & 0x040)
@@ -223,9 +225,58 @@
 #define BP_MASK												(BP (0xfe))
 
 #define BP_TREF(X)										(BP (0x28 + X))
-#define TS_COORD(X)										((BP (0x28 + (X/2)) >> (((X & 1) * 12) + 3)) & 7)
+#define BP_TS(X)											(BP_TREF (X/2) >> ((X & 1) * 12))
+#define TS_COLOR(X)										((BP_TS (X) >> 7) & 7)
+#define TS_ENABLED(X)									(BP_TS (X) & (1 << 6))
+#define TS_TEXCOORD(X)								((BP_TS (X) >> 3) & 7)
+#define TS_TEXMAP(X)									((BP_TS (X) >> 0) & 7)
+
+#define BP_COLOR_ENV(X)								(BP (0xc0 + X*2))
+#define BP_ALPHA_ENV(X)								(BP (0xc1 + X*2))
+
+#define C_COLOR_DEST(X)								((BP_COLOR_ENV (X) >> 22) & 0x03)
+#define C_COLOR_SCALE(X)							((BP_COLOR_ENV (X) >> 20) & 0x03)
+#define C_COLOR_CLAMP(X)							(BP_COLOR_ENV (X) & (1 << 19))
+#define C_COLOR_OP(X)									(BP_COLOR_ENV (X) & (1 << 18))
+#define C_COLOR_BIAS(X)								((BP_COLOR_ENV (X) >> 16) & 0x03)
+#define C_COLOR_A(X)									((BP_COLOR_ENV (X) >> 12) & 0x0f)
+#define C_COLOR_B(X)									((BP_COLOR_ENV (X) >>  8) & 0x0f)
+#define C_COLOR_C(X)									((BP_COLOR_ENV (X) >>  4) & 0x0f)
+#define C_COLOR_D(X)									((BP_COLOR_ENV (X) >>  0) & 0x0f)
+
+#define C_ALPHA_DEST(X)								((BP_ALPHA_ENV (X) >> 22) & 3)
+#define C_ALPHA_SCALE(X)							((BP_ALPHA_ENV (X) >> 20) & 3)
+#define C_ALPHA_CLAMP(X)							(BP_ALPHA_ENV (X) & (1 << 19))
+#define C_ALPHA_OP(X)									(BP_ALPHA_ENV (X) & (1 << 18))
+#define C_ALPHA_BIAS(X)								((BP_ALPHA_ENV (X) >> 16) & 3)
+#define C_ALPHA_A(X)									((BP_ALPHA_ENV (X) >> 13) & 7)
+#define C_ALPHA_B(X)									((BP_ALPHA_ENV (X) >> 10) & 7)
+#define C_ALPHA_C(X)									((BP_ALPHA_ENV (X) >>  7) & 7)
+#define C_ALPHA_D(X)									((BP_ALPHA_ENV (X) >>  4) & 7)
+#define C_ALPHA_TSWAP(X)							((BP_ALPHA_ENV (X) >>  2) & 3)
+#define C_ALPHA_RSWAP(X)							((BP_ALPHA_ENV (X) >>  0) & 3)
+
+#define GX_BIAS_COMPARE									3
+#define GX_BIAS_SUBHALF									2
+#define GX_BIAS_ADDHALF									1
+#define GX_BIAS_ZERO										0
+
+#define BP_KSEL(X)										(BP (0xf6 + X))
+#define KSEL_A1(X)										((BP_KSEL (X) >> 19) & 0x1f)
+#define KSEL_C1(X)										((BP_KSEL (X) >> 14) & 0x1f)
+#define KSEL_A0(X)										((BP_KSEL (X) >>  9) & 0x1f)
+#define KSEL_C0(X)										((BP_KSEL (X) >>  4) & 0x1f)
+#define KSEL_SWAP2(X)									((BP_KSEL (X) >>  2) & 0x03)
+#define KSEL_SWAP1(X)									((BP_KSEL (X) >>  0) & 0x03)
+#define KSEL_A(X)											((BP_KSEL (X/2) >> ((X%2 * 10) + 9)) & 0x1f)
+#define KSEL_C(X)											((BP_KSEL (X/2) >> ((X%2 * 10) + 4)) & 0x1f)
 
 #define CULL_MODE											((BP_GENMODE >> 14) & 3)
+#define BP_BUMPMAPS										((BP_GENMODE >> 16) & 0x07)
+#define BP_TEVSTAGES									((BP_GENMODE >> 10) & 0x0f)
+#define BP_COLORS											((BP_GENMODE >>  4) & 0x1f)
+#define BP_TEXGENS										((BP_GENMODE >>  0) & 0x0f)
+
 
 #define EFB_SRC_TOP										((BP_EFB_SRC_TOP_LEFT >> 10) & 0x3ff)
 #define EFB_SRC_LEFT									((BP_EFB_SRC_TOP_LEFT >>  0) & 0x3ff)

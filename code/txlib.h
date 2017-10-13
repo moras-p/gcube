@@ -53,12 +53,11 @@
 
 
 #ifdef GDEBUG
+#include <curses.h>
 # ifdef WINDOWS
-#  include <ncurses/curses.h>
-# else
-#  include <ncurses.h>
+#  define use_default_colors()		({})
+#  define assume_default_colors(a,b)	({})
 # endif
-//#include <termios.h>
 
 # define ATTRIB_BOLD					A_BOLD
 # define ATTRIB_DIM						A_DIM
@@ -181,5 +180,6 @@ void window_title_clear (Window *win, int a, int b);
 void window_set_title (Window *win, char *title);
 
 int screen_getkey (Screen *screen);
+int screen_getkeyhit (Screen *screen);
 
 #endif // __TXLIB_H 1

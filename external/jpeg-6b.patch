@@ -1,5 +1,5 @@
 --- jpeg-6b/jdhuff.c	1997-10-20 20:51:10 +0200
-+++ jpeg-6b_gcube/jdhuff.c	2017-10-13 10:29:59 +0200
++++ jpeg-6b/jdhuff.c	2017-10-13 10:29:59 +0200
 @@ -324,6 +324,24 @@
  	 * accept multiple FF's followed by a 0 as meaning a single FF data
  	 * byte.  This data pattern is not valid according to the standard.

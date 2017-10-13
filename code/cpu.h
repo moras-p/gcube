@@ -17,13 +17,16 @@ double trunc (double);
 
 
 // registers
-extern __u32 regs[4096];
+extern __u32 cpuregs[4096];
 extern __u64 ps0[32];
 extern __u64 ps1[32];
 
-#define BUS_CLOCK_SPEED					0x09a7ec80
+//#define BUS_CLOCK_SPEED					0x09a7ec80
+#define BUS_CLOCK_SPEED					162000000
 // 486 MHz
-#define CPU_CLOCK_SPEED					0x1cf7c580
+//#define CPU_CLOCK_SPEED					0x1cf7c580
+#define CPU_CLOCK_SPEED					486000000
+
 
 #define TBMAGIC									((__u64) 23 * 365 * 24 * 60 * 60 + 7 * 366 * 24 * 60 * 60)
 #define T2TICKS(t)							((t) * CPU_CLOCK_SPEED / 12)
@@ -64,36 +67,40 @@ extern __u64 ps1[32];
 #define CHANGE_BIT(X,n,b) 	((X) = ((X) &~ (1 << (31-(n)))) | (((b) & 1) << (31-(n))))
 
 
-#define REGS(x)				(regs[x])
-#define FPREGS(x)			(((double *)ps0)[x])
-#define FPREGS_PS0(x)	(((double *)ps0)[x])
-#define FPREGS_PS1(x)	(((double *)ps1)[x])
+#define CPUREGS(x)			(cpuregs[x])
+#define FPUREGS(x)			(((double *)ps0)[x])
+#define FPUREGS_PS0(x)	(((double *)ps0)[x])
+#define FPUREGS_PS1(x)	(((double *)ps1)[x])
 // general purpose registers (r0-r31)
 #define I_GPR		0
-#define GPR 		regs
+#define GPR 		(&CPUREGS (I_GPR))
 // segment registers (sr0-sr15)
 #define I_SR		32
-#define SR			(&regs[I_SR])
+#define SR			(&CPUREGS (I_SR))
 // condition register
 #define I_CR		48
-#define CR			(regs[I_CR])
+#define CR			(CPUREGS (I_CR))
 // machine state register
 #define I_MSR		49
-#define MSR			(regs[I_MSR])
+#define MSR			(CPUREGS (I_MSR))
 // floating point status and control register
 #define I_FPSCR	50
-#define FPSCR		(regs[I_FPSCR])
+#define FPSCR		(CPUREGS (I_FPSCR))
 // time base facility (lower and upper)
 #define I_TBL		51
 #define I_TBU		52
-#define TBL			(regs[I_TBL])
-#define TBU			(regs[I_TBU])
+#define TBL			(CPUREGS (I_TBL))
+#define TBU			(CPUREGS (I_TBU))
 // special purpose registers (spr0-spr1023)
 #define I_SPR		1024
-#define SPR			(&regs[I_SPR])
+#define SPR			(&CPUREGS (I_SPR))
+#define I_DSISR	(I_SPR + 18)
+#define DSISR		(CPUREGS (I_DSISR))
+#define I_DAR		(I_SPR + 19)
+#define DAR			(CPUREGS (I_DAR))
 // for paired singles
 #define I_GQR		(I_SPR + 912)
-#define GQR			(&regs[I_GQR])
+#define GQR			(&CPUREGS (I_GQR))
 #define GQR0		(GQR[0])
 #define GQR1		(GQR[1])
 #define GQR2		(GQR[2])
@@ -104,15 +111,15 @@ extern __u64 ps1[32];
 #define GQR7		(GQR[7])
 // program counter
 #define I_PC		4095
-#define PC			(regs[I_PC])
+#define PC			(CPUREGS (I_PC))
 // instruction counter
 #define I_IC		4094
-#define IC			(regs[I_IC])
+#define IC			(CPUREGS (I_IC))
 // direct memory access registers
 #define I_DMAU	(I_SPR + 922)
-#define DMAU		(regs[I_DMAU])
+#define DMAU		(CPUREGS (I_DMAU))
 #define I_DMAL	(I_SPR + 923)
-#define DMAL		(regs[I_DMAL])
+#define DMAL		(CPUREGS (I_DMAL))
 #define LCE			(HID2 & HID2_LCE)
 #define DMA_MEM_ADDR	(DMAU &~ 0x1f)
 #define DMA_LC_ADDR		(DMAL &~ 0x1f)
@@ -123,37 +130,39 @@ extern __u64 ps1[32];
 
 // stackpointer
 #define I_SP		1
-#define SP			(regs[I_SP])
+#define RSP			(CPUREGS (I_SP))
 #define I_SDA1	2
 #define I_SDA2	13
-#define SDA1		(regs[I_SDA1])
-#define SDA2		(regs[I_SDA2])
+#define SDA1		(CPUREGS (I_SDA1))
+#define SDA2		(CPUREGS (I_SDA2))
 // register specifing carries and overflows for integer operations
 #define I_XER		(I_SPR + 1)
-#define XER			(regs[I_XER])
+#define XER			(CPUREGS (I_XER))
 // link register
 #define I_LR		(I_SPR + 8)
-#define LR			(regs[I_LR])
+#define LR			(CPUREGS (I_LR))
 // count register
 #define I_CTR		(I_SPR + 9)
-#define CTR			(regs[I_CTR])
+#define CTR			(CPUREGS (I_CTR))
 // decrement register
 #define I_DEC		(I_SPR + 22)
-#define DEC			(regs[I_DEC])
+#define DEC			(CPUREGS (I_DEC))
 // machine status save/restore register 0 and 1
 #define I_SRR0	(I_SPR + 26)
 #define I_SRR1	(I_SPR + 27)
-#define SRR0		(regs[I_SRR0])
-#define SRR1		(regs[I_SRR1])
+#define SRR0		(CPUREGS (I_SRR0))
+#define SRR1		(CPUREGS (I_SRR1))
 // hardware implementation registers
 #define I_HID2	(I_SPR + 920)
 #define I_HID0	(I_SPR + 1008)
 #define I_HID1	(I_SPR + 1009)
-#define HID2		(regs[I_HID2])
-#define HID0		(regs[I_HID0])
-#define HID1		(regs[I_HID1])
+#define HID2		(CPUREGS (I_HID2))
+#define HID0		(CPUREGS (I_HID0))
+#define HID1		(CPUREGS (I_HID1))
 #define I_SDR1		(I_SPR + 25)
-#define SDR1			(regs[I_SDR1])
+#define SDR1			(CPUREGS (I_SDR1))
+#define I_PVR			(I_SPR + 287)
+#define PVR				(CPUREGS (I_PVR))
 #define I_IBAT0U	(I_SPR + 528)
 #define I_IBAT0L	(I_SPR + 529)
 #define I_IBAT1U	(I_SPR + 530)
@@ -162,8 +171,8 @@ extern __u64 ps1[32];
 #define I_IBAT2L	(I_SPR + 533)
 #define I_IBAT3U	(I_SPR + 534)
 #define I_IBAT3L	(I_SPR + 535)
-#define IBATU(X)	(regs[I_IBAT0U + 2*X])
-#define IBATL(X)	(regs[I_IBAT0L + 2*X])
+#define IBATU(X)	(CPUREGS (I_IBAT0U + 2*X))
+#define IBATL(X)	(CPUREGS (I_IBAT0L + 2*X))
 #define I_DBAT0U	(I_SPR + 536)
 #define I_DBAT0L	(I_SPR + 537)
 #define I_DBAT1U	(I_SPR + 538)
@@ -172,8 +181,8 @@ extern __u64 ps1[32];
 #define I_DBAT2L	(I_SPR + 541)
 #define I_DBAT3U	(I_SPR + 542)
 #define I_DBAT3L	(I_SPR + 543)
-#define DBATU(X)	(regs[I_DBAT0U + 2*X])
-#define DBATL(X)	(regs[I_DBAT0L + 2*X])
+#define DBATU(X)	(CPUREGS (I_DBAT0U + 2*X))
+#define DBATL(X)	(CPUREGS (I_DBAT0L + 2*X))
 
 #define HID2_LSQE		(1 << 31)
 #define HID2_WPE		(1 << 30)
@@ -182,7 +191,7 @@ extern __u64 ps1[32];
 #define HID2_DMAQL	((HID2 >> 4) & 0xf)
 
 #define I_WPAR	(I_SPR + 921)
-#define WPAR		(regs[I_WPAR])
+#define WPAR		(CPUREGS (I_WPAR))
 
 // floating point registers (access as fp and binary)
 #define FPR			((double *)ps0)
@@ -476,8 +485,39 @@ extern __u64 ps1[32];
 
 #define BATL_BRPN(X)			(X >> 17)
 #define BATL_WIMG(X)			((X >> 3) & 0x0f)
+#define BATL_W						(1 <<  6)
+#define BATL_I						(1 <<  5)
+#define BATL_M						(1 <<  4)
+#define BATL_G						(1 <<  3)
 #define BATL_PP(X)				(X & 3)
 
+#define SR_T							(1 << 31)
+#define SR_KS							(1 << 30)
+#define SR_KP							(1 << 29)
+#define SR_N							(1 << 28)
+#define SR_VSID(X)				(X & 0x00ffffff)
+
+#define SDR1_HTABORG			(SDR1 >> 16)
+#define SDR1_HTABMASK			(SDR1 & 0x000001ff)
+
+#define EA_SR(X)					(X >> 28)
+#define EA_API(X)					((X >> 22) & 0x3f)
+#define EA_PI(X)					((X >> 12) & 0xffff)
+#define EA_OFFSET(X)			(X & 0xfff)
+
+#define PTE1_V						(1 << 31)
+#define PTE1_VSID(X)			((X >> 7) & 0x00ffffff)
+#define PTE1_H						(1 <<  6)
+#define PTE1_API(X)				(X & 0x3f)
+
+#define PTE2_RPN(X)				(X >> 12)
+#define PTE2_R						(1 << 8)
+#define PTE2_C						(1 << 7)
+#define PTE2_W						(1 << 6)
+#define PTE2_I						(1 << 5)
+#define PTE2_M						(1 << 4)
+#define PTE2_G						(1 << 3)
+#define PTE2_PP(X)				(X & 3)
 
 // exceptions
 #define EXCEPTION_SYSTEM_RESET					0x80000100
@@ -495,6 +535,19 @@ extern __u64 ps1[32];
 #define EXCEPTION_IABR									0x80001300
 #define EXCEPTION_RESERVED							0x80001400
 #define EXCEPTION_THERMAL								0x80001700
+
+#define DSISR_PAGE									(1 << 30)
+#define DSISR_PROT									(1 << 27)
+#define DSISR_STORE									(1 << 25)
+
+#define SRR1_PAGE										(1 << 30)
+#define SRR1_GUARD									(1 << 28)
+
+// processor version number
+#define PVR_GEKKO										0x7000
+#define PVR_GEKKO_EARLY_HW					0x0008
+#define PVR_REVISION_FIRST					0x0100
+#define PVR_REVISION								0xbabe
 
 extern int ref_delay;
 

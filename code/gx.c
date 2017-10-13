@@ -25,8 +25,8 @@
 #include "hw_gx.h"
 #include <SDL/SDL_opengl.h>
 
+#include "gl_ext.h"
 
-float xscale = 1, yscale = 1;
 float max_anisotropy = 1;
 
 
@@ -36,6 +36,18 @@ void gx_set_max_anisotropy (float a)
 	max_anisotropy = a;
 }
 
+
+int gx_get_real_height (void)
+{
+	// just trying to guess the number of lines
+	return (FLOAT_EQ (-XF_VIEWPORT_B * 2, 448) ? 448 : 480);
+}
+
+
+int gx_get_real_width (void)
+{
+	return (((XF_VIEWPORT_A * 2) < RVI16 (0x2070)) ? RVI16 (0x2070) : (XF_VIEWPORT_A * 2));
+}
 
 
 void gx_set_texture_mode0 (int index)
@@ -60,7 +72,7 @@ void gx_set_texture_mode0 (int index)
 	};
 	float aniso;
 	
-	
+
 	DEBUG (EVENT_LOG_GX, "....  TEX WRAP %d/%d FILTER %d/%d ANISO %d LOD BIAS %.1f DIAGLOAD %d CLAMP %d",
 				 TEX_MODE_WRAP_S (index), TEX_MODE_WRAP_T (index),
 				 TEX_MODE_MAG_FILTER (index), TEX_MODE_MIN_FILTER (index),
@@ -327,7 +339,7 @@ void gx_set_cmode0 (void)
 		// lame windows need the extensions to be loaded manually
 		// comment this line to compile it
 #ifndef NO_GL_EXT
-//		glBlendEquation(CMODE_SUBTRACT ? GL_FUNC_REVERSE_SUBTRACT : GL_FUNC_ADD);
+		glBlendEquation (CMODE_SUBTRACT ? GL_FUNC_REVERSE_SUBTRACT : GL_FUNC_ADD);
 #endif
 	}
 	else
@@ -506,6 +518,7 @@ void gx_set_copy_clear_z (void)
 #define BILLY_FIX	0
 void gx_set_scissors (void)
 {
+	float xscale, yscale;
 	int x, y, w, h, xofs, yofs;
 
 
@@ -527,6 +540,10 @@ void gx_set_scissors (void)
 	x -= xofs;
 	y -= yofs;
 #endif
+
+	xscale = (float) screen_width / gx_get_real_width ();
+	yscale = (float) screen_height / gx_get_real_height ();
+
 	h *= yscale;
 	y *= yscale;
 	w *= xscale;
@@ -542,7 +559,7 @@ void gx_set_scissors (void)
 
 void gx_set_viewport (void)
 {
-	float x, y, w, h, n, f, real_height, real_width;
+	float x, y, w, h, n, f, xscale, yscale;
 
 
 	w = XF_VIEWPORT_A * 2;
@@ -556,15 +573,11 @@ void gx_set_viewport (void)
 	DEBUG (EVENT_LOG_GX, "....  VIEWPORT %.2f %.2f %.2f %.2f %.2f %.2f",
 				 x, y, w, h, n, f);
 
-	// just trying to guess the number of lines
-	real_height = (FLOAT_EQ (h, 448)) ? 448 : 480;
-	if (w < RVI16 (0x2070))
-		real_width = RVI16 (0x2070);
-	else
-		real_width = w;
+	xscale = (float) screen_width / gx_get_real_width ();
+	yscale = (float) screen_height / gx_get_real_height ();
 
-	xscale = (float) screen_width / real_width;
-	yscale = (float) screen_height / real_height;
+	// double scale -> egg mania fix
+	// yscale *= 2;
 
 	h *= yscale;
 	y *= yscale;
@@ -609,7 +622,10 @@ void gx_copy_efb (void)
 	}
 	else
 	{
-		float x, y, w, h;
+		float x, y, w, h, xscale, yscale;
+
+		xscale = (float) screen_width / gx_get_real_width ();
+		yscale = (float) screen_height / gx_get_real_height ();
 
 		w = xscale * (EFB_SRC_WIDTH + 1);
 		h = yscale * (EFB_SRC_HEIGHT + 1);
@@ -633,4 +649,7 @@ void gx_copy_efb (void)
 			glPopAttrib ();
 		}
 	}
+	
+	// fix this
+	force_refresh ();
 }

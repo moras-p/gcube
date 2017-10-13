@@ -137,10 +137,10 @@ void config_defaults (void)
 {
 	int default_kbmap[] =
 	{
-		KEY_RETURN, KEY_q, KEY_w, KEY_s, KEY_a, KEY_z, KEY_x, KEY_c,
-		KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT,
-		KEY_KP8, KEY_KP5, KEY_KP4, KEY_KP6,
-		KEY_HOME, KEY_END, KEY_DELETE, KEY_PAGEDOWN,
+		IKEY_RETURN, IKEY_q, IKEY_w, IKEY_s, IKEY_a, IKEY_z, IKEY_x, IKEY_c,
+		IKEY_UP, IKEY_DOWN, IKEY_LEFT, IKEY_RIGHT,
+		IKEY_KP8, IKEY_KP5, IKEY_KP4, IKEY_KP6,
+		IKEY_HOME, IKEY_END, IKEY_DELETE, IKEY_PAGEDOWN,
 	};
 	int default_padbmap[] =
 	{

@@ -324,6 +324,24 @@ jpeg_fill_bit_buffer (bitread_working_state * state,
 	 * accept multiple FF's followed by a 0 as meaning a single FF data
 	 * byte.  This data pattern is not valid according to the standard.
 	 */
+// fix for gcube's thpview
+#if 1
+				// if behind SOS marker
+				if (cinfo->input_scan_number > 0)
+				{
+					unsigned char cc = GETJOCTET (*next_input_byte);
+
+					// stop only if it's EOI marker, and its the end of buffer
+					if ((cc == 0xd9) && (bytes_in_buffer <= 4))
+					{
+						cinfo->unread_marker = cc;
+						bytes_in_buffer--;
+						next_input_byte++;
+
+						goto no_more_bytes;
+					}
+				}
+#else
 	do {
 	  if (bytes_in_buffer == 0) {
 	    if (! (*cinfo->src->fill_input_buffer) (cinfo))
@@ -351,6 +369,7 @@ jpeg_fill_bit_buffer (bitread_working_state * state,
 	  /* See if we need to insert some fake zero bits. */
 	  goto no_more_bytes;
 	}
+#endif
       }
 
       /* OK, load c into get_buffer */
