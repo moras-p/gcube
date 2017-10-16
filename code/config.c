@@ -30,7 +30,7 @@ Configuration config;
 
 char *config_read_string (const char *cf, const char *key, const char *def)
 {
-	char *str = NULL, *p;
+	char *str = NULL; const char *p;
 	char buff[256] = {0};
 
 
@@ -84,7 +84,7 @@ const int constants_int[] =
 
 int config_parse_int (const char *cf, const char *key, int def)
 {
-	int d, i;
+	unsigned int d, i;
 	char *str;
 
 
@@ -169,6 +169,11 @@ void config_defaults (void)
 		memcpy (config.padamap[i], default_padamap, PADAMAP_SIZE * sizeof (int));
 	}
 
+	config.memcard_a_size = DEFAULT_MEMCARD_SIZE;
+	config.memcard_a_name = DEFAULT_MEMCARD_A_NAME;
+	config.memcard_b_size = DEFAULT_MEMCARD_SIZE;
+	config.memcard_b_name = DEFAULT_MEMCARD_B_NAME;
+
 	config.buffer_size = DEFAULT_BUFFER_SIZE;
 	config.texcache_size = DEFAULT_TEXCACHE_SIZE;
 }
@@ -201,7 +206,7 @@ Configuration *config_load (const char *filename)
 	size = ftell (f);
 	fseek (f, 0, SEEK_SET);
 	
-	cf = calloc (1, size + 1);
+	cf = (char *) calloc (1, size + 1);
 	fread (cf, 1, size, f);
 	fclose (f);
 
@@ -242,6 +247,12 @@ Configuration *config_load (const char *filename)
 	config_read_int_array (cf, "gamepad2_amap", config.padamap[1], PADAMAP_SIZE);
 	config_read_int_array (cf, "gamepad3_amap", config.padamap[2], PADAMAP_SIZE);
 	config_read_int_array (cf, "gamepad4_amap", config.padamap[3], PADAMAP_SIZE);
+
+	// audio
+	config.memcard_a_size = config_read_int (cf, "memcard_a_size", DEFAULT_MEMCARD_SIZE);
+	config.memcard_a_name = config_read_string (cf, "memcard_a_name", DEFAULT_MEMCARD_A_NAME);
+	config.memcard_b_size = config_read_int (cf, "memcard_b_size", DEFAULT_MEMCARD_SIZE);
+	config.memcard_b_name = config_read_string (cf, "memcard_b_name", DEFAULT_MEMCARD_B_NAME);
 
 	// audio
 	config.buffer_size = config_read_int (cf, "buffer_size", DEFAULT_BUFFER_SIZE);
@@ -320,6 +331,12 @@ void config_save (const char *filename)
 	config_write_int_array (f, "gamepad2_amap", config.padamap[1], PADAMAP_SIZE);
 	config_write_int_array (f, "gamepad3_amap", config.padamap[2], PADAMAP_SIZE);
 	config_write_int_array (f, "gamepad4_amap", config.padamap[3], PADAMAP_SIZE);
+
+	fprintf (f,	"\n// memory cards (size in mbits)\n");
+	config_write_int (f, "memcard_a_size", config.memcard_a_size);
+	config_write_int (f, "memcard_b_size", config.memcard_b_size);
+	config_write_string (f, "memcard_a_name", config.memcard_a_name);
+	config_write_string (f, "memcard_b_name", config.memcard_b_name);
 
 	fprintf (f,	"\n// audio buffer size from 512 to 8192\n");
 	fprintf (f,	"// good values: linux 512, windows 8192 (smaller = faster response)\n");

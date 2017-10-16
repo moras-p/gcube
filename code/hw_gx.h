@@ -61,6 +61,7 @@
 #define VCD_TMIDX(n)									(CP_VCD_LO & (2 << (n)))
 #define VCD_PMIDX											(CP_VCD_LO & 0x001)
 
+#define VAT_NORMAL_IDX3(X)						((CP_VAT_A(X) >> 31) & 0x01)
 #define VAT_BYTE_DEQUANT(X)						((CP_VAT_A(X) >> 30) & 0x01)
 #define VAT_TEX0_SHFT(X)							((CP_VAT_A(X) >> 25) & 0x1f)
 #define VAT_TEX0_FMT(X)								((CP_VAT_A(X) >> 22) & 0x07)
@@ -510,7 +511,9 @@
 #define TLUT_FORMAT_RGB565						1
 #define TLUT_FORMAT_RGB5A3						2
 
-#define GL_TEXTURE_RECTANGLE					GL_TEXTURE_RECTANGLE_NV
+#ifndef GL_TEXTURE_RECTANGLE
+# define GL_TEXTURE_RECTANGLE					GL_TEXTURE_RECTANGLE_NV
+#endif
 
 
 // 0, DIRECT_U8, DIRECT_S8, ..., I8_U8, I8_S8, ..., I16_U8, I16_S8, ...
@@ -518,11 +521,30 @@
 #define GXIDX(X,v) ((VCD_##X == 0) ? 0 : \
  ((((VCD_##X - 1) << 4) | (VAT_##X##_CNT(v) << 3) | VAT_##X##_FMT(v)) + 1))
 
-// VCD:
+#define GXIDX_NORMAL(X,v) ((VCD_##X == 0) ? 0 : \
+ (((VAT_NORMAL_IDX3(v) << 6) | ((VCD_##X - 1) << 4) | (VAT_##X##_CNT(v) << 3) | VAT_##X##_FMT(v)) + 1))
+
+// triple index for three normals
+// 1 tt c fff
+
+// VCD: (tt)
 //   0 - no data
 //   1 - direct
 //   2 - 8 bit index
 //   3 - 16 bit index
+
+// COUNT: (c)
+//   0 - POS xy  NORMAL xyz     TEX s  COLOR rgb
+//   1 - POS xyz NORMAL xyz*nbt TEX st COLOR rgba
+
+// FMT: (fff)
+//   0 - u8  / 16b rgb565
+//   1 - s8  / 24b rgb888
+//   2 - u16 / 32b rgb888x
+//   3 - s16 / 16b rgba4444
+//   4 - f32 / 24b rgba6666
+//   5 - n/a / 32b rgba8888
+//   (no unsigned values for normals)
 
 #define GPOP(X) 						(gpop[X])
 #define GPOPR(m,n,X)\
@@ -587,11 +609,6 @@
 // check only main fifo, not pregenerated display lists
 #define EXCEEDES_LIST_BOUNDARY(m,s)		((m >= CP_FIFO_END) ? FALSE : ((m & MEM_MASK) + (s) >= CP_FIFO_END))
 
-#ifdef LIL_ENDIAN
-# define MASK_ALPHA		0xff000000
-#else
-# define MASK_ALPHA		0xff
-#endif
 
 
 typedef struct

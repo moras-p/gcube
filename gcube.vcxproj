@@ -96,6 +96,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="code\audio.h" />
+    <ClInclude Include="code\ax.h" />
+    <ClInclude Include="code\cg.h" />
     <ClInclude Include="code\config.h" />
     <ClInclude Include="code\cpu.h" />
     <ClInclude Include="code\diskio.h" />
@@ -125,6 +127,7 @@
     <ClInclude Include="code\hw_vi.h" />
     <ClInclude Include="code\jpeg_tools.h" />
     <ClInclude Include="code\keys_sdl.h" />
+    <ClInclude Include="code\mapdb.h" />
     <ClInclude Include="code\mem.h" />
     <ClInclude Include="code\ppc_disasm.h" />
     <ClInclude Include="code\scandir.h" />
@@ -140,6 +143,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="code\audio_sdl.c" />
+    <ClCompile Include="code\cg.c" />
+    <ClCompile Include="code\cg_vertex.c" />
     <ClCompile Include="code\config.c" />
     <ClCompile Include="code\cpu.c" />
     <ClCompile Include="code\diskio.c" />
@@ -147,6 +152,7 @@
     <ClCompile Include="code\dsp_opcodes.c" />
     <ClCompile Include="code\font_ansi.c" />
     <ClCompile Include="code\font_sjis.c" />
+    <ClCompile Include="code\gcmap.c" />
     <ClCompile Include="code\gcube.c" />
     <ClCompile Include="code\general.c" />
     <ClCompile Include="code\gl_ext.c" />
@@ -173,9 +179,8 @@
     <ClCompile Include="code\jpeg_tools.c" />
     <ClCompile Include="code\mapdb.c" />
     <ClCompile Include="code\mem.c" />
-    <ClCompile Include="code\ppc_disasm.c" />
-    <ClCompile Include="code\scandir.c" />
     <ClCompile Include="code\timer_sdl.c" />
+    <ClCompile Include="code\tplx.c" />
     <ClCompile Include="code\txlib.c" />
     <ClCompile Include="code\video_sdl.c" />
     <ClCompile Include="external\ppc_disasm\ppc_disasm.c" />
@@ -188,6 +193,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ChangeLog" />
+    <None Include="code\cg_fragment.cg" />
     <None Include="COPYING" />
     <None Include="Makefile.rules" />
     <None Include="Makefile.win" />

@@ -1,26 +1,45 @@
 
-  0.6a   - mmu emulation
+  0.7b  - same as 0.7a, but contains fixes in the direction of gcube
+		  compiling as c++ code (under vc++)
+		- mapdb speed up
 
-  0.6    - various fixes
+  0.7a  - dsp emulation improvements
+	    - ar/di interrupts counters added
+		- mapdb contains much more entries now
+		- improved old gx alphafuncs
+
+  0.7   - adp streams emulation (not yet finished)
+        - vsync changes (ocarina pushes a little further)
+
+  0.6e  - cleanups
+
+  0.6d  - improved dsp emulation, memcards work, though aid int
+	      isn't called often enough yet
+
+  0.6c  - memcard emulation (not yet working due to dsp problems)
+
+  0.6a  - mmu emulation
+
+  0.6   - various fixes
 
   0.5c  - cleanups
 		- applied patches by Roland Illig fixing compile errors on NetBSD
 
   0.5b  - many improvements to the new rendering engine, some for the old one
-			new engine requires shader support now (arbvp1 and arbfp1) and
-			nvidia-cg-toolkit to compile
-	      - emulated screen resolution can be given in the command line now
+		  new engine requires shader support now (arbvp1 and arbfp1) and
+		  nvidia-cg-toolkit to compile
+	    - emulated screen resolution can be given in the command line now
 
   0.5a  - when video mode is set, vi registers are set to predefined values
-			depending on system (ntsc / pal)
+		  depending on system (ntsc / pal)
 
   0.5   - compilation under windows should now be much easier. use dev-cpp
-			and the supplied project files.
+		  and the supplied project files.
 		- various compatibility improvements
         - fixed some ugly bugs
 		- consequent video frames can now be saved as files and later
-			converted into video using tga2avi script
-			(needs mencoder from mplayer package)
+		  converted into video using tga2avi script
+		  (needs mencoder from mplayer package)
 		- thpview now faster and with sound support.
 
   0.4   - better interrupt handling and dsp emulation

@@ -13,7 +13,7 @@
 #define ARAM_SIZE					0x01000000
 #define	ARAM_MASK					0x00ffffff
 
-#define ARAM_ADDRESS(X)		(&ARAM [X])
+#define ARAM_ADDRESS(X)		(&aram [X])
 
 #ifdef LIL_ENDIAN
 # define RDSP16(X)					(*((__u16 *) &rdsp[RDSP_SIZE - ((X) & RDSP_MASK) - 2]))
@@ -33,9 +33,15 @@
 #endif
 
 
+#define ARAM(X)						(aram[(X) & ARAM_MASK])
+#define ARAM_R8(X)				(ARAM(X))
+#define ARAM_R8S(X)				((__s8) ARAM(X))
+#define ARAM_R16(X)				(BSWAP16 (*((__u16 *) &ARAM (X))))
+#define ARAM_R16S(X)			((__s16) ARAM_R16 (X))
+
 extern __u8 rdsp[RDSP_SIZE];
 extern __u8 rai[RAI_SIZE];
-extern __u8 ARAM[ARAM_SIZE];
+extern __u8 aram[ARAM_SIZE];
 
 
 #define DSP_CSR							0x500a
@@ -62,12 +68,15 @@ extern __u8 ARAM[ARAM_SIZE];
 #define AICR_AFR						(1 << 1)
 #define AICR_PSTAT					(1 << 0)
 
+#define AI_STREAMING				(AICR & AICR_PSTAT)
+
 // volume
 #define AI_VR								0x6c04
 
 #define AI_AISCNT						0x6c08
 #define AISCNT							(RAI32 (AI_AISCNT))
 #define AI_IT								0x6c0c
+#define AIIT								(RAI32 (AI_IT))
 
 #define ARCNT_READ					0x80000000
 
@@ -81,10 +90,10 @@ extern __u8 ARAM[ARAM_SIZE];
 #define DSP_DMACR						0x5036
 #define DSP_DMA_BLOCKS_LEFT	0x503a
 #define DMACR_PLAY					(0x8000)
+#define DMACR_DMA_EN				(0x8000)
 
 // len >> 5
 #define STREAM_BLOCKS_LEFT		(RDSP16 (DSP_DMA_BLOCKS_LEFT))
-#define STREAM_FINISHED				(RDSP16 (DSP_DMACR) &= ~DMACR_PLAY)
 
 // to dsp / from dsp
 #define DSP_MBOX_H						0x5000
@@ -129,6 +138,10 @@ void dsp_generate_interrupt (__u32 mask);
 
 void dsp_mail_push (__u32 mail);
 void dsp_update (void);
+
+void ai_counter_inc (__u32 samples);
+
+void dsp_check_interrupts (void);
 
 
 #endif // __HW_DSP_H

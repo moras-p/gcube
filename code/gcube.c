@@ -24,12 +24,12 @@
 
 #include "gcube.h"
 
-#include "mapdb.c"
-
+extern MapDBItem mapdb[];
 
 int gcube_running = FALSE;
 char *quit_message = NULL;
-Map *map = NULL, *mdb = NULL;
+Map *map = NULL;
+MapDBItem *mdb = mapdb;
 char mount_dir[256] = {0};
 int do_save_state = FALSE;
 int hle_enabled = FALSE;
@@ -55,6 +55,8 @@ int emu_state = GCUBE_RUN;
 int emu_state = GDEBUG_RUN;
 # endif
 int gdebug_running = FALSE;
+
+int dsp_disassemble (char **buff, __u16 *mem);
 
 int command_find (char *cmd);
 void debugger_parse_command (char *command);
@@ -97,7 +99,6 @@ typedef enum
 	DEBUG_EXI_C0_INT_TC, DEBUG_EXI_C0_INT_EXT, DEBUG_EXI_C0_INT_EXI,
 	DEBUG_EXI_C1_INT_TC, DEBUG_EXI_C1_INT_EXT, DEBUG_EXI_C1_INT_EXI,
 	DEBUG_EXI_C2_INT_TC, DEBUG_EXI_C2_INT_EXT, DEBUG_EXI_C2_INT_EXI,
-	DEBUG_EXI_C3_INT_TC, DEBUG_EXI_C3_INT_EXT, DEBUG_EXI_C3_INT_EXI,
 	DEBUG_SI_INT_TC, DEBUG_SI_INT_RDST,
 	DEBUG_DI_INT_BRK, DEBUG_DI_INT_TC, DEBUG_DI_INT_DE, DEBUG_DI_INT_CVR,
 	DEBUG_CP_INT_BP,
@@ -230,9 +231,6 @@ UIDef constants[] =
 	{ "int_exi_c2_tc", DEBUG_EXI_C2_INT_TC },
 	{ "int_exi_c2_ext", DEBUG_EXI_C2_INT_EXT },
 	{ "int_exi_c2_exi", DEBUG_EXI_C2_INT_EXI },
-	{ "int_exi_c3_tc", DEBUG_EXI_C3_INT_TC },
-	{ "int_exi_c3_ext", DEBUG_EXI_C3_INT_EXT },
-	{ "int_exi_c3_exi", DEBUG_EXI_C3_INT_EXI },
 	{ "int_si_tc", DEBUG_SI_INT_TC },
 	{ "int_si_rdst", DEBUG_SI_INT_RDST },
 	{ "int_di_brk", DEBUG_DI_INT_BRK },
@@ -256,6 +254,7 @@ UIDef constants[] =
 	{ "log_gx", LOG_ENABLE_GX },
 	{ "log_hle", LOG_ENABLE_HLE },
 	{ "log_calls", LOG_ENABLE_CALLS },
+	{ "log_mc", LOG_ENABLE_MC },
 	
 	{ "gxt_wireframe", GX_TOGGLE_WIREFRAME },
 	{ "gxt_tex_reload", GX_TOGGLE_TEX_RELOAD },
@@ -277,6 +276,7 @@ UIPDef variables[] =
 
 	{ "code", &debugger.code_address },
 	{ "mem", &debugger.mem_address },
+	{ "dspcode", &debugger.dspcode_address },
 	{ "log_enable", &debugger.log_enable },
 	{ "refresh_rate", &debugger.refresh_rate },
 	{ "refresh_delay", &debugger.refresh_delay },
@@ -299,7 +299,7 @@ char *path_compact (char *path, char *rel)
 		s = strrchr (path, '/');
 		if (s)
 		{
-			buff = calloc (1, strlen (path) - strlen (s) + 1);
+			buff = (char *) calloc (1, strlen (path) - strlen (s) + 1);
 			strncpy (buff, path, strlen (path) - strlen (s));
 			return buff;
 		}
@@ -307,7 +307,7 @@ char *path_compact (char *path, char *rel)
 
 	if (path)
 	{
-		buff = calloc (1, strlen (path) + strlen (rel) + 2);
+		buff = (char *) calloc (1, strlen (path) + strlen (rel) + 2);
 		sprintf (buff, "%s/%s", path, rel);
 	}
 	else
@@ -364,7 +364,7 @@ void browser_change_path (Browser *b, char *rel)
 
 	b->dir.path = new_path;
 	b->nitems = b->dir.nitems = --n;
-	b->dir.items = calloc (b->nitems, sizeof (DirectoryItem));
+	b->dir.items = (DirectoryItem *) calloc (b->nitems, sizeof (DirectoryItem));
 
 	// no '.' entry
 	// first time, only directories
@@ -396,6 +396,8 @@ void browser_change_path (Browser *b, char *rel)
 						 (0 == strcasecmp (buff, "imp")) ||
 						 (0 == strcasecmp (&b->dir.items[n].name[strlen (b->dir.items[n].name) - 6], "gcm.gz")))
 			b->dir.items[n].type = DIR_ITEM_GCM;
+		else if (0 == strcasecmp (buff, "gci"))
+			b->dir.items[n].type = DIR_ITEM_GCI;
 		else
 			b->dir.items[n].type = DIR_ITEM_FILE;
 		n++;
@@ -481,7 +483,8 @@ void browser_show (Window *win, Browser *b, int nlines)
 				window_line_set_attribs (win, i, 0, 80, FG_MAGENTA, ATTRIB_STANDOUT);
 			else if (b->dir.items[pos].type == DIR_ITEM_DIRECTORY)
 				window_line_set_attribs (win, i, 0, 80, FG_GREEN, 0);
-			else if (b->dir.items[pos].type == DIR_ITEM_EXECUTABLE)
+			else if ((b->dir.items[pos].type == DIR_ITEM_EXECUTABLE) ||
+							 (b->dir.items[pos].type == DIR_ITEM_GCI))
 				window_line_set_attribs (win, i, 0, 80, FG_RED, 0);
 
 			window_printf (win, 3, i, b->dir.items[pos++].name);
@@ -547,7 +550,7 @@ int on_browser_keypress (Window *win, int key, int modifiers, void *data)
 					
 					if (f)
 					{
-						char *buff = malloc (DUMP_BUFFER_SIZE);
+						char *buff = (char *) malloc (DUMP_BUFFER_SIZE);
 						__u32 size = p->size;
 
 						file_seek (debugger.browser.file, p->offset, SEEK_SET);
@@ -586,10 +589,10 @@ int on_browser_keypress (Window *win, int key, int modifiers, void *data)
 					if (p->sub)
 					{
 						debugger.browser.current_dir->last_pos = debugger.browser.pos;
-						debugger.browser.current_dir = p->sub;
+						debugger.browser.current_dir = (Dir *) p->sub;
 					}
 					else
-						debugger.browser.current_dir = p->parent;
+						debugger.browser.current_dir = (Dir *) p->parent;
 
 					if (debugger.browser.current_dir)
 					{
@@ -633,6 +636,22 @@ int on_browser_keypress (Window *win, int key, int modifiers, void *data)
 						
 						if (gcube_load_file (buff))
 							debugger_cmd_detach (NULL);
+
+						screen_redraw (&debugger.screen);
+					}
+					break;
+				
+				case DIR_ITEM_GCI:
+					{
+						char buff[1024];
+
+						sprintf (buff, "%s/%s", debugger.browser.dir.path,
+											debugger.browser.dir.items[debugger.browser.pos].name);
+						
+						if (mc_import_file (0, buff))
+							debug_printf ("gci imported to memcard a");
+						else
+							debug_printf ("error importing gci");
 
 						screen_redraw (&debugger.screen);
 					}
@@ -848,13 +867,14 @@ int args_extract_double (char *args, double *d)
 	int n = 0;
 	__u64 a;
 
-
+#ifndef WINDOWS
 	// try hex
 	if (1 <= sscanf (args, " 0x%llx%n", &a, &n))
 	{
-		*d = ((Double64) a).fp;
+		*d = U64TODOUBLE (a);
 		return n + 1;
 	}
+#endif
 
 	// try bin
 	if (1 <= sscanf (args, " 0b%s%n", buff, &n))
@@ -886,7 +906,7 @@ int args_extract_str (char *args, char *d)
 int args_extract_constant (char *args, unsigned int *c)
 {
 	char r[LINE_WIDTH + 1] = {0};
-	int i, n;
+	unsigned int i, n;
 
 
 	if ((n = args_extract_str (args, r)))
@@ -905,7 +925,7 @@ int args_extract_constant (char *args, unsigned int *c)
 int args_extract_variable (char *args, unsigned int *index)
 {
 	char r[LINE_WIDTH + 1] = {0};
-	int i, n;
+	unsigned int i, n;
 
 
 	if ((n = args_extract_str (args, r)))
@@ -924,7 +944,7 @@ int args_extract_variable (char *args, unsigned int *index)
 int args_extract_reg (char *args, unsigned int *regindex)
 {
 	char r[LINE_WIDTH + 1] = {0};
-	int i, n;
+	unsigned int i, n;
 
 
 	if ((n = args_extract_str (args, r)))
@@ -1006,7 +1026,7 @@ int args_parse_int (char *args, int *d)
 	MapItem *mi;
 
 
-	if ((n = args_extract_reg (args, d)))
+	if ((n = args_extract_reg (args, (unsigned int *) d)))
 	{
 		if (reg_indices[*d] < I_FPR)
 			*d = CPUREGS (reg_indices[*d]);
@@ -1019,9 +1039,9 @@ int args_parse_int (char *args, int *d)
 
 		return n;
 	}
-	else if ((n = args_extract_constant (args, d)))
+	else if ((n = args_extract_constant (args, (unsigned int *) d)))
 		return n;
-	else if ((n = args_extract_variable (args, d)))
+	else if ((n = args_extract_variable (args, (unsigned int *) d)))
 	{
 		*d = *variables[*d].uip;
 		return n;
@@ -1102,7 +1122,7 @@ int args_parse_subexpression (char *args, unsigned int *d)
 		n += k;
 		k = 0;
 		sscanf (args + n, " %[^*/-+^%&~|<> ]%n", buff, &k);
-		if (!k || !args_parse_uint (buff, &b))
+		if (!k || !args_parse_uint (buff, (unsigned int *) &b))
 			return n;
 
 		switch (*op)
@@ -1164,7 +1184,7 @@ int args_parse_expression_uint (char *args, unsigned int *d)
 
 	while (1)
 	{
-		if (!(k = args_parse_subexpression (args + n + 1, &a)))
+		if (!(k = args_parse_subexpression (args + n + 1, (unsigned int *) &a)))
 			return n + 1;
 
 		switch (args[n])
@@ -1333,15 +1353,15 @@ int args_parse_subexpression_double (char *args, double *d)
 				break;
 
 			case '^':
-				*d = ((Double64)((((Double64) *d).bin) ^ (((Double64) b).bin))).fp;
+				*d = U64TODOUBLE (DOUBLETOU64 (*d) ^ DOUBLETOU64 (b));
 				break;
 		
 			case '&':
-				*d = ((Double64)((((Double64) *d).bin) & (((Double64) b).bin))).fp;
+				*d = U64TODOUBLE (DOUBLETOU64 (*d) & DOUBLETOU64 (b));
 				break;
 		
 			case '|':
-				*d = ((Double64)((((Double64) *d).bin) | (((Double64) b).bin))).fp;
+				*d = U64TODOUBLE (DOUBLETOU64 (*d) | DOUBLETOU64 (b));
 				break;
 		
 			default:
@@ -1436,7 +1456,7 @@ void output_code_line (__u32 addr)
 
 void debugger_cmd_run (char *args)
 {
-	int i = 0, key;
+	unsigned int i = 0, key;
 	MapItem *mi;
 	Breakpoint *bp;
 
@@ -1677,7 +1697,7 @@ void debugger_print_msr (void)
 		"FE1", "IP", "IR", "DR", "RI", "LE",
 	};
 	char buff[LINE_WIDTH + 1] = {0};
-	int i;
+	unsigned int i;
 	
 	
 	for (i = 0; i < sizeof (msr_bitmasks) / 4; i++)
@@ -1842,7 +1862,7 @@ void debugger_cmd_exception (char *args)
 
 	if (args_parse_expression_uint (args, &d))
 	{
-		cpu_exception (d + 4);
+		cpu_exception_dont_advance (d + 4);
 		debugger.code_address = PC;
 	}
 	else
@@ -1850,15 +1870,17 @@ void debugger_cmd_exception (char *args)
 }
 
 #include "hw_ai_dsp.h"
+// this one sucks, if interrupt happens right now, one instruction is omitted
 void debugger_cmd_interrupt (char *args)
 {
-	__u32 d;
+	__u32 d, gen;
 
 
 	if (args_parse_expression_uint (args, &d))
 	{
 		MEM32 (EXCEPTION_EXTERNAL - 4) = BSWAP32 (0x60000000);
 
+		gen = TRUE;
 		switch (d)
 		{
 			case DEBUG_PE_INT_FIN:
@@ -1886,7 +1908,6 @@ void debugger_cmd_interrupt (char *args)
 				break;
 
 			case DEBUG_DSP_INT_DSP:
-				dsp_mail_push (0xdcd10001);
 				dsp_generate_interrupt (DSP_INTERRUPT_DSP);
 				break;
 
@@ -1915,39 +1936,27 @@ void debugger_cmd_interrupt (char *args)
 				break;
 
 			case DEBUG_EXI_C1_INT_TC:
-				exi_generate_interrupt (EXI_INTERRUPT_TC, 0);
+				exi_generate_interrupt (EXI_INTERRUPT_TC, 1);
 				break;
 
 			case DEBUG_EXI_C1_INT_EXT:
-				exi_generate_interrupt (EXI_INTERRUPT_EXT, 0);
+				exi_generate_interrupt (EXI_INTERRUPT_EXT, 1);
 				break;
 
 			case DEBUG_EXI_C1_INT_EXI:
-				exi_generate_interrupt (EXI_INTERRUPT_EXI, 0);
+				exi_generate_interrupt (EXI_INTERRUPT_EXI, 1);
 				break;
 
 			case DEBUG_EXI_C2_INT_TC:
-				exi_generate_interrupt (EXI_INTERRUPT_TC, 0);
+				exi_generate_interrupt (EXI_INTERRUPT_TC, 2);
 				break;
 
 			case DEBUG_EXI_C2_INT_EXT:
-				exi_generate_interrupt (EXI_INTERRUPT_EXT, 0);
+				exi_generate_interrupt (EXI_INTERRUPT_EXT, 2);
 				break;
 
 			case DEBUG_EXI_C2_INT_EXI:
-				exi_generate_interrupt (EXI_INTERRUPT_EXI, 0);
-				break;
-
-			case DEBUG_EXI_C3_INT_TC:
-				exi_generate_interrupt (EXI_INTERRUPT_TC, 0);
-				break;
-
-			case DEBUG_EXI_C3_INT_EXT:
-				exi_generate_interrupt (EXI_INTERRUPT_EXT, 0);
-				break;
-
-			case DEBUG_EXI_C3_INT_EXI:
-				exi_generate_interrupt (EXI_INTERRUPT_EXI, 0);
+				exi_generate_interrupt (EXI_INTERRUPT_EXI, 2);
 				break;
 
 			case DEBUG_SI_INT_TC:
@@ -1977,8 +1986,12 @@ void debugger_cmd_interrupt (char *args)
 			case DEBUG_CP_INT_BP:
 				cp_generate_interrupt (CP_INTERRUPT_BP);
 				break;
+			
+			default:
+				gen = FALSE;
 		}
 
+		debug_printf ("interrupt %s", gen ? "generated" : "unknown");
 		debugger.code_address = PC;
 	}
 	else
@@ -2029,7 +2042,7 @@ void debugger_cmd_print_double (char *args)
 
 	if ((n = args_parse_expression_double (args, &d)))
 	{
-		debug_printf ("0x%.16llx\t%lf\t%d", ((Double64) d).bin, d, (int) d);
+		debug_printf ("0x%.16llx\t%lf\t%d", DOUBLETOU64 (d), d, (int) d);
 		debugger.result = (__u32) d;
 	}
 	else
@@ -2120,7 +2133,7 @@ Breakpoint *debugger_add_breakpoint (__u32 address, int type)
 		}
 		else
 		{
-			bp = calloc (1, sizeof (Breakpoint));
+			bp = (Breakpoint *) calloc (1, sizeof (Breakpoint));
 			bp->type = type;
 			bp->address = address;
 			bp->enabled = TRUE;
@@ -2138,7 +2151,7 @@ Breakpoint *debugger_add_breakpoint (__u32 address, int type)
 		}
 		else
 		{
-			bp = calloc (1, sizeof (Breakpoint));
+			bp = (Breakpoint *) calloc (1, sizeof (Breakpoint));
 			bp->type = type;
 			bp->address = address;
 			bp->enabled = TRUE;
@@ -2172,7 +2185,7 @@ void debugger_remove_breakpoint (Breakpoint *bp)
 
 void debugger_breakpoints_destroy (void)
 {
-	int i;
+	unsigned int i;
 	Breakpoint *bp;
 
 
@@ -2389,7 +2402,7 @@ void debugger_cmd_be (char *args)
 // list all breakpoints
 void debugger_cmd_bl (char *args)
 {
-	int i;
+	unsigned int i;
 	Breakpoint *bp;
 	char *bp_names[] =
 	{
@@ -2509,14 +2522,15 @@ void debugger_cmd_bpex (char *args)
 
 void debugger_cmd_bpuhw (char *args)
 {
-	unsigned int n, k;
+	unsigned int n;
+	int k;
 	char str[LINE_WIDTH + 1];
 
 	
 	
 	if ((n = args_extract_str (args, str)))
 	{
-		if (!args_parse_expression_uint (args + n, &k))
+		if (!args_parse_expression_uint (args + n, (unsigned int *) &k))
 			k = -1;
 
 		if (0 == strcasecmp (str, "read"))
@@ -2550,7 +2564,7 @@ void debugger_cmd_xfb (char *args)
 
 	if (args_parse_expression_uint (args, &fb))
 	{
-		video_set_framebuffer (MEM_ADDRESS (fb));
+		video_set_framebuffer ((unsigned char *) MEM_ADDRESS (fb));
 		debug_printf ("xfb set to 0x%.8x", fb);
 	}
 	else
@@ -2737,7 +2751,7 @@ void debugger_cmd_save (char *args)
 
 	if ((n = args_extract_str (args, filename)))
 	{
-		if (!args_parse_expression_uint (args + n, &compress))
+		if (!args_parse_expression_uint (args + n, (unsigned int *) &compress))
 			compress = debugger.compress_states;
 	}
 	else
@@ -2757,15 +2771,6 @@ void debugger_cmd_save (char *args)
 
 	if (hle_enabled)
 		hle (map, TRUE);
-}
-
-
-void debugger_cmd_mdbinternal (char *args)
-{
-	output_immediate_append (&debugger.output, "preparing the database...");
-	
-	mdb = map_extract_db (mapdb);
-	debug_print ("done. internal database will be used for map generation.");
 }
 
 
@@ -2804,11 +2809,12 @@ void debugger_cmd_mdbload (char *args)
 	if (!(n = args_extract_str (args, filename)))
 		return debug_print ("* usage: mdbload filename");
 
-	map_destroy (mdb);
+	if (mdb != mapdb)
+		mdb_destroy (mdb);
 
-	mdb = map_load_db (filename);
+	mdb = mdb_load (filename);
 	if (mdb)
-		debug_printf ("loaded file %s with %d items", filename, mdb->nitems);
+		debug_printf ("loaded file %s", filename);
 	else
 		debug_printf ("can't load file %s: %s", filename, strerror (errno));
 }
@@ -2819,8 +2825,8 @@ void debugger_cmd_mapgen (char *args)
 	if (!mdb)
 	{
 		output_immediate_append (&debugger.output, "using internal database...");
-	
-		mdb = map_extract_db (mapdb);
+
+		mdb = mapdb;
 	}
 
 	map_destroy (map);
@@ -2897,7 +2903,7 @@ void debugger_cmd_dumpstream (char *args)
 			n += k;
 			if ((k = args_parse_expression_uint (args + n, &length)))
 			{
-				if (audio_dump_stream (filename, MEM_ADDRESS (address), length))
+				if (audio_dump_stream (filename, (char *) MEM_ADDRESS (address), length))
 					debug_printf ("stream dumped to %s", filename);
 				else
 					debug_printf ("error dumping stream: %s", strerror (errno));
@@ -2931,10 +2937,10 @@ void debugger_cmd_dumptexture (char *args)
 					n += k;
 					if ((k = args_parse_expression_uint (args + n, &format)))
 					{
-						buff = gx_convert_texture (MEM_ADDRESS (address), width, height, format, NULL, 0);
+						buff = (char *) gx_convert_texture ((__u8 *) MEM_ADDRESS (address), width, height, format, NULL, 0);
 						if (buff)
 						{
-							if (video_dump_texture (filename, buff, width, height))
+							if (video_dump_texture (filename, (char *) buff, width, height))
 								debug_printf ("texture dumped to %s", filename);
 							else
 								debug_printf ("error dumping texture: %s", strerror (errno));
@@ -3001,7 +3007,7 @@ void debugger_cmd_hlelist (char *args)
 
 void debugger_cmd_hle (char *args)
 {
-	unsigned int n;
+	int n;
 	char buff[LINE_WIDTH + 1];
 	const char *estat[] =
 	{
@@ -3149,7 +3155,7 @@ void debugger_cmd_gxtoggle (char *args)
 
 void debugger_cmd_showregs (char *args)
 {
-	int i;
+	unsigned int i;
 	int indices[] =
 	{
 		I_PC, I_LR, I_CR, I_FPSCR, I_MSR, I_IC, I_XER, I_CTR, I_DEC, I_SDA1, I_SDA2, 
@@ -3208,12 +3214,40 @@ void debugger_cmd_fifo (char *args)
 }
 
 
+void debugger_cmd_mmu (char *args)
+{
+	__u32 addr, pa, type, k;
+	const char *type_str[] =
+	{
+		"data  read", "data write", "code fetch",
+	};
+
+
+	if ((k = args_parse_expression_uint (args, &addr)))
+	{
+		if (!args_parse_expression_uint (args + k, &type))
+			type = 0;
+
+		if (!mmu_effective_to_physical_debug (&pa, addr, type))
+			debug_printf ("MMU translation failed for 0x%.8x", addr);
+		else
+			debug_printf ("MMU translation for %s: effective 0x%.8x -> physical 0x%.8x",
+										type_str[type], addr, pa);
+	}
+	else
+	{
+		debug_printf ("Current MMU setup:");
+		mmu_print_setup ();
+	}
+}
+
+
 // topmost item won't always be valid
 void debugger_cmd_callstack (char *args)
 {
 	__u32 addr = RSP;
 	__u32 next, lrsave, func, op;
-	MapItem *mi;
+	MapItem *mi, *mi2;
 	int i = 0;
 	
 
@@ -3225,7 +3259,7 @@ void debugger_cmd_callstack (char *args)
 	{
 		lrsave = MEM32_SAFE (addr + 4) - 4;
 		op = MEM32_SAFE (lrsave);
-		if (!op)
+		if (!op || (op == OPCODE_BLR))
 		{
 			addr = next;
 			continue;
@@ -3237,10 +3271,21 @@ void debugger_cmd_callstack (char *args)
 			func = lrsave + EXTS (26, op &~ 0xfc000003);
 
 		mi = map_get_item_by_address (map, func);
+		mi2 = map_get_item_containing_address (map, lrsave);
 		if (mi)
-			debug_printf ("%d  %.8x -> %s", i, lrsave, mi->name);
+		{
+			if (mi2)
+				debug_printf ("%2.2d  %.8x in %s -> %s", i, lrsave, mi2->name, mi->name);
+			else
+				debug_printf ("%2.2d  %.8x -> %s", i, lrsave, mi->name);
+		}
 		else
-			debug_printf ("%d  %.8x -> %.8x", i, lrsave, func);
+		{
+			if (mi2)
+				debug_printf ("%2.2d  %.8x in %s -> %.8x", i, lrsave, mi2->name, func);
+			else
+				debug_printf ("%2.2d  %.8x -> %.8x", i, lrsave, func);
+		}
 
 		addr = next;
 		i++;
@@ -3277,6 +3322,50 @@ void debugger_cmd_memcpy (char *args)
 	}
 
 	debug_printf ("memcpy dst src length");
+}
+
+
+void debugger_cmd_mcattach (char *args)
+{
+	unsigned int sw;
+
+
+	if (args_parse_expression_uint (args, &sw))
+	{
+		mc_attach (sw);
+		debug_printf ("memcard %d attached", sw);
+	}
+	else
+		debug_print ("* usage: mcattach mc | mc is 0 or 1");
+}
+
+
+void debugger_cmd_mcformat (char *args)
+{
+	unsigned int sw;
+
+
+	if (args_parse_expression_uint (args, &sw))
+	{
+		mc_format (sw);
+		debug_printf ("memcard %d formatted", sw);
+	}
+	else
+		debug_print ("* usage: mcformat mc | mc is 0 or 1");
+}
+
+
+void debugger_cmd_dsppush (char *args)
+{
+	unsigned int sw;
+
+
+	if (args_parse_expression_uint (args, &sw))
+	{
+		dsp_mail_push (sw);
+	}
+	else
+		debug_print ("* usage: dsppush mail");
 }
 
 
@@ -3326,7 +3415,6 @@ Command commands[] =
 	{ "hwh", "hardware read / write half", debugger_cmd_hwh },
 	{ "mdbsave", "generate and save map database", debugger_cmd_mdbsave },
 	{ "mdbload", "load map database", debugger_cmd_mdbload },
-	{ "mdbinternal", "use internal map database", debugger_cmd_mdbinternal },
 	{ "map", "show memory map entries", debugger_cmd_map },
 	{ "mapadd", "add memory map entry", debugger_cmd_mapadd },
 	{ "mapgen", "generate map file using previously loaded mdb file", debugger_cmd_mapgen },
@@ -3342,8 +3430,12 @@ Command commands[] =
 	{ "gxtoggle", "toggle gx switch", debugger_cmd_gxtoggle },
 	{ "showregs", "display the contents of registers", debugger_cmd_showregs },
 	{ "fifo", "show current fifo informations", debugger_cmd_fifo },
+	{ "mmu", "show current mmu setup", debugger_cmd_mmu },
 	{ "callstack", "display callstack", debugger_cmd_callstack },
 	{ "memcpy", "copy memory", debugger_cmd_memcpy },
+	{ "mcattach", "attach memory cards", debugger_cmd_mcattach },
+	{ "mcformat", "format memory cards", debugger_cmd_mcformat },
+	{ "dsppush", "dsp mail send", debugger_cmd_dsppush },
 };
 
 
@@ -3492,6 +3584,11 @@ void gdebug_event (int event, const char *format, ...)
 			}
 			break;
 
+		case EVENT_LOG_MC:
+			if (debugger.log_enable & LOG_ENABLE_MC)
+				output_vappend (&debugger.output, ap, format);
+			break;
+
 		case EVENT_LOG_HLE:
 			if (debugger.log_enable & LOG_ENABLE_HLE)
 				output_vappend (&debugger.output, ap, format);
@@ -3546,7 +3643,7 @@ void debugger_cmd_quit (char *args)
 
 int command_find (char *cmd)
 {
-	int i;
+	unsigned int i;
 
 
 	for (i = 0; i < (sizeof (commands) / sizeof (Command)); i++)
@@ -3562,7 +3659,7 @@ int command_find (char *cmd)
 
 void debugger_cmd_help (char *args)
 {
-	int i;
+	unsigned int i;
 	char buff[LINE_WIDTH + 1];
 	
 
@@ -3643,12 +3740,21 @@ void code_show (Window *win, int lines, unsigned int addr)
 	int i;
 	Breakpoint *bp;
 	MapItem *mi;
+	__u32 pa;
 
 
 	addr -= (win->nlines/2) * 4;
 	for (i = win->nlines - lines; i < win->nlines; i++)
 	{
-		op = MEM32_SAFE (addr);
+		if (!mmu_effective_to_physical_debug (&pa, addr, 2))
+		{
+			window_printf (win, 0, i, "%.8x  %.8x", addr, 0);
+			addr += 4;
+			continue;
+		}
+
+//		op = MEM32_SAFE (addr);
+		op = MEM32_SAFE (pa);
 		disassemble (opcode, operand, op, addr, &target);
 		window_clear_line (win, i);
 		
@@ -3845,7 +3951,7 @@ void regs_show (Window *win, int sw)
 	}
 
 	window_cprintf (win, 8, 4, FG_BLUE, "cr       fpscr    xer      msr      ctr      hid0     hid1     hid2");
-	window_printf (win, 15, 4, (GET_CR0 & CR_EQ) ? "=" : (GET_CR0 & CR_LT) ? "<" : (GET_CR0 & CR_GT) ? ">" : "");
+	window_printf (win, 15, 4, (char *) ((GET_CR0 & CR_EQ) ? "=" : (GET_CR0 & CR_LT) ? "<" : (GET_CR0 & CR_GT) ? ">" : ""));
 	for (i = 0; i < 8; i++)
 	{
 		window_cprintf (win, 8 + i*9, 5, fgc[oldregs[row1[i]] != CPUREGS (row1[i])],
@@ -3886,7 +3992,7 @@ void output_show (Window *win, OutputWin *out, int nlines, int pos)
 
 void simple_uitoa (char *buff, unsigned int n)
 {
-	int i = 0;
+	unsigned int i = 0;
 	char c;
 
 
@@ -3909,6 +4015,9 @@ void simple_uitoa (char *buff, unsigned int n)
 
 void output_append (OutputWin *out, char *str)
 {
+	char buff[1024];
+
+
 	if (out->nitems)
 	{
 		char *last = out->items[output_item_index (out, out->nitems - 1)];
@@ -3916,25 +4025,32 @@ void output_append (OutputWin *out, char *str)
 		
 		if (0 == strncmp (last, str, slen))
 		{
-			// same string
 			int lastlen = strlen (last);
 			
 			if (lastlen == slen)
 			{
-				char *newstr = malloc (LINE_WIDTH + 1);
-				
+				// same string
+				char *newstr = (char *) malloc (LINE_WIDTH + 1);
+
 				strcpy (newstr, str);
-				strcat (newstr, " x 2");
+				strcat (newstr, " | x 2");
 				free (last);
 				out->items[output_item_index (out, out->nitems - 1)] = newstr;
 			}
 			else
 			{
-				int n = atoi (&last[slen + 3]);
+				// possibly same
+				int n;
 				
-				simple_uitoa (&last[slen + 3], n+1);
+				sprintf (buff, "%s | x %%d", str);
+				if (1 == sscanf (last, buff, &n))
+				{
+					sprintf (buff, "%s | x %d", str, n + 1);
+					free (last);
+					out->items[output_item_index (out, out->nitems - 1)] = strdup (buff);
+				}
 			}
-			
+
 			return;
 		}
 	}
@@ -3974,7 +4090,7 @@ void output_immediate_append (OutputWin *out, char *str)
 	if (out->pos < 0)
 		out->pos = 0;
 
-	if (gdebug_running)
+	if (emu_state & GDEBUG_OPENED)
 	{
 		output_show (debugger.output_win, out, debugger.output_win->nlines, out->pos);
 		screen_refresh (&debugger.screen);
@@ -4165,9 +4281,9 @@ int on_mem_keypress (Window *win, int key, int modifiers, void *data)
 }
 
 
-int buff_keystroke (char *buff, int *pos, int maxh, int key)
+int buff_keystroke (char *buff, unsigned int *pos, unsigned int maxh, int key)
 {
-	int i;
+	unsigned int i;
 
 
 	if (key >= 0x20 && key < 0x7f)
@@ -4410,14 +4526,27 @@ void on_code_scroll (Window *win, int nlines, int direction, void *data)
 // dsp code
 void dspcode_show (Window *win, int lines, unsigned int addr)
 {
-	unsigned int isize, i;
+	unsigned int isize;
+	int i;
+	__u32 pa;
 	char *decoded;
 
 
 	addr -= (win->nlines/2) * 2;
 	for (i = win->nlines - lines; i < win->nlines; i++)
 	{
-		isize = dsp_disassemble (&decoded, MEM_ADDRESS (addr));
+		if (!mmu_effective_to_physical_debug (&pa, addr, 2))
+		{
+			window_clear_line (win, i);
+
+			if (addr == debugger.dspcode_address)
+				window_line_set_attribs (win, i, 0, 80, FG_WHITE, ATTRIB_INVERT);
+			window_printf (win, 0, i, "%.8x  ", addr);
+			addr += 2;
+			continue;
+		}
+
+		isize = dsp_disassemble (&decoded, (__u16 *) MEM_ADDRESS (pa));
 		window_clear_line (win, i);
 		
 		if (addr == debugger.dspcode_address)
@@ -4703,6 +4832,7 @@ int on_command_keypress (Window *win, int key, int modifiers, void *data)
 	switch (key)
 	{
 		// enter
+		case 0x0a:
 		case 0x0d:
 			debugger_execute_command ();
 			screen_redraw_window (&debugger.screen, win);
@@ -4784,10 +4914,14 @@ typedef struct
 	char *title;
 	
 	// callbacks
-	void *keypress;
-	void *refresh;
-	void *resize;
-	void *scroll;
+//	void *keypress;
+//	void *refresh;
+//	void *resize;
+//	void *scroll;
+	int (*keypress) (Window *, int, int, void *);
+	void (*refresh) (Window *, void *);
+	void (*resize) (Window *, int, void *);
+	void (*scroll) (Window *, int, int, void *);
 } WinMode;
 
 WinMode cwmodes[] =
@@ -4803,10 +4937,10 @@ void set_window_mode (Window *win, WinMode *mode)
 	window_clear (win);
 	window_set_title (win, mode->title);
 		
-	window_add_keypress_callback (win, mode->keypress, NULL);
-	window_add_refresh_callback (win, mode->refresh, NULL);
-	window_add_size_change_callback (win, mode->resize, NULL);
-	window_add_scroll_callback (win, mode->scroll, NULL);
+	window_add_keypress_callback (win, (void *) mode->keypress, NULL);
+	window_add_refresh_callback (win, (void *) mode->refresh, NULL);
+	window_add_size_change_callback (win, (void *) mode->resize, NULL);
+	window_add_scroll_callback (win, (void *) mode->scroll, NULL);
 }
 
 
@@ -4839,7 +4973,7 @@ void sprint_intmask (char *buff, __u32 b)
 		"HSP", "DBG", "CP", "PFIN", "PTOK", "VI", "MEM", "DSP", "AI",
 		"EXI", "SI", "DI", "RSW", "ERROR",
 	};
-	int i;
+	unsigned int i;
 
 
 	for (i = 0; i < sizeof (bitmasks) / 4; i++)
@@ -4969,7 +5103,6 @@ void gdebug_run (__u32 pc)
 		debugger.compress_states = TRUE;
 
 		debugger.initialized = TRUE;
-		debugger.log_enable = 0;
 
 		debugger.refresh_delay = ref_delay;
 		
@@ -4988,17 +5121,17 @@ void gdebug_run (__u32 pc)
 	win->fixed_size = TRUE;
 	if (debugger.regs_hidden)
 		win->hidden = TRUE;
-	window_add_refresh_callback (win, on_regs_refresh, NULL);
-	window_add_keypress_callback (win, on_regs_keypress, NULL);
+	window_add_refresh_callback (win, (void *) on_regs_refresh, NULL);
+	window_add_keypress_callback (win, (void *) on_regs_keypress, NULL);
 	screen_add_window (&debugger.screen, win);
 
 	debugger.mem_win = win = window_create (0, 0, debugger.mem_lines, ".mem:");
 	if (debugger.mem_hidden)
 		win->hidden = TRUE;
-	window_add_refresh_callback (win, on_mem_refresh, NULL);
-	window_add_size_change_callback (win, on_mem_resize, NULL);
-	window_add_scroll_callback (win, on_mem_scroll, NULL);
-	window_add_keypress_callback (win, on_mem_keypress, NULL);
+	window_add_refresh_callback (win, (void *) on_mem_refresh, NULL);
+	window_add_size_change_callback (win, (void *) on_mem_resize, NULL);
+	window_add_scroll_callback (win, (void *) on_mem_scroll, NULL);
+	window_add_keypress_callback (win, (void *) on_mem_keypress, NULL);
 	screen_add_window (&debugger.screen, win);
 
 	debugger.code_win = win = window_create (0, 0, debugger.code_lines, ".code:");
@@ -5011,25 +5144,25 @@ void gdebug_run (__u32 pc)
 	debugger.output.visitems = debugger.output_lines;
 	if (debugger.output_hidden)
 		win->hidden = TRUE;
-	window_add_refresh_callback (win, on_output_refresh, NULL);
-	window_add_size_change_callback (win, on_output_resize, NULL);
-	window_add_scroll_callback (win, on_output_scroll, NULL);
+	window_add_refresh_callback (win, (void *) on_output_refresh, NULL);
+	window_add_size_change_callback (win, (void *) on_output_resize, NULL);
+	window_add_scroll_callback (win, (void *) on_output_scroll, NULL);
 	screen_add_window (&debugger.screen, win);
 
 	debugger.console_win = win = window_create (0, 0, 1, ".command:");
 	win->no_title = TRUE;
 	win->fixed_size = TRUE;
 	win->always_visible = TRUE;
-	window_add_keypress_callback (win, on_command_keypress, NULL);
-	window_add_enter_callback (win, on_command_enter, NULL);
-	window_add_refresh_callback (win, on_command_refresh, NULL);
+	window_add_keypress_callback (win, (void *) on_command_keypress, NULL);
+	window_add_enter_callback (win, (void *) on_command_enter, NULL);
+	window_add_refresh_callback (win, (void *) on_command_refresh, NULL);
 	screen_add_window (&debugger.screen, win);
 
 	screen_collapse (&debugger.screen, 0);
 	screen_expand (&debugger.screen, 0);
 
-	screen_add_keypress_callback (&debugger.screen, on_keypress, NULL);
-	screen_add_unhandled_keypress_callback (&debugger.screen, on_unhandled_keypress, NULL);
+	screen_add_keypress_callback (&debugger.screen, (void *) on_keypress, NULL);
+	screen_add_unhandled_keypress_callback (&debugger.screen, (void *) on_unhandled_keypress, NULL);
 	screen_redraw (&debugger.screen);
 	screen_select_window (&debugger.screen, SELECT_LAST);
 
@@ -5075,7 +5208,8 @@ void generate_map (void)
 	if (!mdb)
 	{
 		DEBUG (EVENT_DEBUG_MSG, "preparing function database...");
-		mdb = map_extract_db (mapdb);
+
+		mdb = mapdb;
 	}
 
 	map_destroy (map);
@@ -5166,12 +5300,29 @@ void enable_hle (int enable)
 
 	if (enable)
 	{
-		hle (map, TRUE);
+		if (enable == 1) // safe
+		{
+			// reports
+			hle_function (map, "OSReport_crippled", TRUE);
+			hle_function (map, "BS2Report", TRUE);
+			hle_function (map, "DBPrintf", TRUE);
+			hle_function (map, "__DSP_debug_printf", TRUE);
+			hle_function (map, "Console_printf", TRUE);
+
+			hle_function (map, "DCFlushRange", TRUE);
+
+			DEBUG (EVENT_DEBUG_MSG, "hle safe mode on");
+		}
+		else
+		{
+			hle (map, TRUE);
+
+			DEBUG (EVENT_DEBUG_MSG, "hle is on");
+		}
+
 #ifdef GDEBUG
 		hle_enabled = TRUE;
 #endif
-
-		DEBUG (EVENT_DEBUG_MSG, "hle is on");
 	}
 	else
 	{
@@ -5365,26 +5516,33 @@ void gcube_quit (char *msg)
 	quit_message = msg;
 }
 
-
+#undef main
 int main (int argc, char **argv)
 {
+	//freopen("CON", "w", stdout);
+	//freopen("CON", "w", stderr);
+
 	int option_index = 0, c;
 	struct option long_options[] =
 	{
 		{"help", 0, 0, 'h'},
-		{"debug", 0, 0, 'd'},
 		{"fullscreen", 0, 0, 'f'},
 		{"ewidth", 1, 0, 'x'},
 		{"eheight", 1, 0, 'y'},
 		{"mount", 1, 0, 'm'},
-		{"color-mode", 1, 0, 'c'},
 		{"ignore-movies", 1, 0, 'i'},
 		{"refresh-delay", 1, 0, 'r'},
-		{"hle", 0, 0, 'l'},
+		{"hle", 1, 0, 'l'},
 		{"hle-input", 0, 0, 'p'},
 		{"save-maps", 1, 0, 's'},
 		{"fix-flickering", 0, 0, '0'},
 		{"fix-blending", 0, 0, '1'},
+		{"mdb-gen", 0, 0, 'b'},
+#ifdef GDEBUG
+		{"debug", 0, 0, 'd'},
+		{"color-mode", 1, 0, 'c'},
+		{"dlog", 1, 0, 'g'},
+#endif
 		{0, 0, 0, 0},
 	};
 #ifdef GDEBUG
@@ -5392,11 +5550,11 @@ int main (int argc, char **argv)
 #endif
 	int fullscreen = FALSE;
 	int ignore_movies = 0;
-	int hle_input = FALSE, use_hle = FALSE, save_gen_map = FALSE;
+	int hle_input = FALSE, use_hle = FALSE, save_gen_map = FALSE, mdbgen = FALSE;
 
 
 	opterr = 0;
-	while (-1 != (c = getopt_long (argc, argv, "hdf01x:y:m:c:i:r:pls", long_options, &option_index)))
+	while (-1 != (c = getopt_long (argc, argv, "hf01bx:y:m:i:r:l:psdc:g:", long_options, &option_index)))
 	{
 		switch (c)
 		{
@@ -5414,17 +5572,22 @@ int main (int argc, char **argv)
 				printf ("                                        THP, H4M and STR files\n");
 				printf ("  -r, --refresh-delay=VALUE        number of instructions executed before\n");
 				printf ("                                   the video interrupt occurs\n");
-				printf ("  -l, --hle                        use high level emulation\n");
+				printf ("  -l, --hle=N                      use high level emulation:\n");
+				printf ("                                    0 - no hle\n");
+				printf ("                                    1 - safe\n");
+				printf ("                                    2 - full\n");
 				printf ("  -p, --hle-input                  use only high level input emulation\n");
 				printf ("  -s, --save-maps                  save generated maps\n");
 				printf ("      --fix-flickering             fix flickering (sonic mega collection)\n");
 				printf ("      --fix-blending               fix blending (aggressive inline)\n");
+				printf ("  -b, --mdb-gen                    generate mdb and quit (needs map)\n");
 #ifdef GDEBUG
 				printf ("  -d, --debug                      run debugger at start\n");
 				printf ("  -c, --color-mode=MODE            debugger color mode:\n");
 				printf ("                                    0 - black and white\n");
 				printf ("                                    1 - default with transparent background\n");
 				printf ("                                    2 - default with white background\n");
+				printf ("  -g, --dlog=MASK                  debugger log mask (hex)\n");
 #endif
 				printf ("  -h, --help                       display this help and exit\n");
 				return FALSE;
@@ -5438,6 +5601,12 @@ int main (int argc, char **argv)
 			case 'c':
 #ifdef GDEBUG
 				sscanf (optarg, "%d", &colors);
+#endif
+				break;
+
+			case 'g':
+#ifdef GDEBUG
+				sscanf (optarg, "%x", &debugger.log_enable);
 #endif
 				break;
 
@@ -5466,11 +5635,15 @@ int main (int argc, char **argv)
 				break;
 
 			case 'l':
-				use_hle = TRUE;
+				sscanf (optarg, "%d", &use_hle);
 				break;
 
 			case 'p':
 				hle_input = TRUE;
+				break;
+
+			case 'b':
+				mdbgen = TRUE;
 				break;
 
 			case 's':
@@ -5507,6 +5680,27 @@ int main (int argc, char **argv)
 		return FALSE;
 	}
 
+	if (mdbgen)
+	{
+		if (!map)
+			printf ("%s: no map file, can't generate mdb.\n", gcbin_filename);
+		else
+		{
+			char filename[1024];
+
+			strcpy (filename, gcbin_filename);
+			kill_extension (filename);
+			strcat (filename, ".mdb");
+
+			map_save_db (map, filename);
+		}
+	
+		video_close ();
+		map_destroy (map);
+		
+		return FALSE;
+	}
+
 	config_load ("gcuberc");
 
 #ifdef OPEN_WINDOW_ON_START
@@ -5536,6 +5730,9 @@ int main (int argc, char **argv)
 		enable_hle (use_hle);
 	else if (hle_input)
 		enable_hle_input (hle_input);
+
+
+	mc_init ();
 
 #ifdef GDEBUG
 	debugger.colors = colors;
@@ -5570,8 +5767,11 @@ int main (int argc, char **argv)
 
 	video_close ();
 	map_destroy (map);
-	map_destroy (mdb);
+	if (mdb != mapdb)
+		mdb_destroy (mdb);
 	mdvd_close ();
+
+	mc_cleanup ();
 
 	if (quit_message)
 		printf ("%s\n", quit_message);

@@ -23,11 +23,11 @@
  */
 
 #include <SDL/SDL_opengl.h>
-
 #include "cg.h"
 #include "hw_gx.h"
 
 #include "cg_vertex.c"
+#include "cg_fragment.c"
 
 #define CG_DUMP_F				0
 #define CG_LOAD_F				0
@@ -44,6 +44,7 @@ float s_indscale[3];
 int s_aref[2];
 int s_tus[8][2];
 
+char *cg_inc = NULL;
 
 typedef struct
 {
@@ -102,6 +103,18 @@ void cg_cleanup (void)
 		cgDestroyContext (cg_context);
 }
 
+char *cg_get_def_program (const char *filename)
+{
+	char buff[1024];
+	char *prg = NULL;
+
+	sprintf(buff, "%s/%s", get_home_dir(), filename);
+	prg = f2str(buff);
+	if (!prg)
+		prg = code_cg_fragment_cg;
+
+	return prg;
+}
 
 int cg_init (void)
 {
@@ -354,7 +367,7 @@ void cg_params_set_tus (int n, unsigned int c1, unsigned int c2)
 
 void cg_get_tev_magic (MagicNum *m)
 {
-	int i, stc, stt;
+	unsigned int i, stc, stt;
 	
 
 	magic_num_reset (m);
@@ -419,7 +432,7 @@ void cg_fpcache_clear (void)
 
 int cg_fpcache_fetch (MagicNum *magic)
 {
-	int i;
+	unsigned int i;
 
 
 	for (i = 0; i < nfptags; i++)
@@ -796,7 +809,6 @@ const int tev_fmt_bits[] =
 
 
 static char sbuff[0xffff];
-char *cg_inc = NULL;
 
 #define CG_START									(sbuff[0] = '\0')
 #define CG_PRINT(s)								(strcat (sbuff, s))
@@ -850,11 +862,17 @@ void cg_fp_print_config (void)
 
 char *cg_gen_fp (void)
 {
-	int i, stc, stt, mi;
+	unsigned int i, stc, stt, mi;
 
 
 	if (!cg_inc)
-		cg_inc = f2str ("/big/dev/c/gcube/release/0.5c/cg_fragment.cg");
+		cg_inc = cg_get_def_program("cg_fragment.cg");
+
+	if (!cg_inc)
+	{
+		DEBUG(EVENT_EFATAL, "..cg: cg_fragment.cg not found!");
+		return NULL;
+	}
 
 	CG_START;
 	CG_PRINT (cg_inc);
@@ -1104,11 +1122,11 @@ int cg_get_program_f (void)
 #endif
 			cgGLLoadProgram (fpcache[n].cg_program);
 
-			printf ("fpcache[%d] (%8.8x)%s%s%s%s\n", nfptags, magic_num_xmagic (magic),
-							prg_str ? "" : ", loaded from disk",
-							BP_INDSTAGES ? ", indirect stages" : "",
-							TEV_Z_OP ? ", z texture" : "",
-							TEV_FOG_FSEL ? ", fog" : "");
+			//printf ("fpcache[%d] (%8.8x)%s%s%s%s\n", nfptags, magic_num_xmagic (magic),
+			//				prg_str ? "" : ", loaded from disk",
+			//				BP_INDSTAGES ? ", indirect stages" : "",
+			//				TEV_Z_OP ? ", z texture" : "",
+			//				TEV_FOG_FSEL ? ", fog" : "");
 		}
 		else
 		{

@@ -25,6 +25,147 @@
 #include "hw.h"
 
 
+
+//////////////////////////////////////////////////////////////////////////////
+// this is a mess, needs cleaning up and fixing, but for now it works
+#define CPUREGS_PRIV 512
+#define refresh_delay			(CPUREGS (CPUREGS_PRIV + 2))
+#define pe_refresh				(CPUREGS (CPUREGS_PRIV + 3))
+#define vcount						(CPUREGS (CPUREGS_PRIV + 4))
+#define do_postretrace		(CPUREGS (CPUREGS_PRIV + 5))
+#define retrace_count			(CPUREGS (CPUREGS_PRIV + 6))
+#define fifo_count				(CPUREGS (CPUREGS_PRIV + 7))
+#define audio_count				(CPUREGS (CPUREGS_PRIV + 8))
+#define AUDIO_COUNT 			0x2ffff
+#define FIFO_COUNT 				0xaffff
+#define RETRACE_COUNT 		0xfffff
+
+int ref_delay = 110000;
+
+
+void zero_state (void)
+{
+	refresh_delay = 640*480*3;
+	retrace_count = RETRACE_COUNT;
+	fifo_count = FIFO_COUNT;
+	audio_count = AUDIO_COUNT;
+}
+
+
+void gcube_perf_vertices (int count)
+{
+	vcount += count;
+}
+
+
+void gcube_pe_refresh (void)
+{
+	pe_refresh = TRUE;
+
+	// refresh only if something was drawn
+	if (vcount)
+	{
+		refresh_delay = ref_delay;
+
+		vcount = 0;
+		video_refresh_nofb ();
+	}
+	else
+		video_input_check ();
+}
+
+
+void hw_force_vi_refresh (void)
+{
+	IC = refresh_delay;
+}
+
+
+void do_refresh (void)
+{
+	if (IC > refresh_delay)
+	{
+		IC = 0;
+		vi_refresh ();
+		if (!pe_refresh)
+			video_refresh ();
+	}
+}
+
+
+void (*vid_refresh) (void) = do_refresh;
+
+
+void refresh_manual (void)
+{
+	if (IC > 640*480*30)
+	{
+		refresh_delay = 640*480*5;
+		vid_refresh = do_refresh;
+	}
+}
+
+
+void gcube_refresh_manual (void)
+{
+	vid_refresh = refresh_manual;
+	// don't call vi interrupt too often
+	if (IC > 0xfff)
+	{
+		IC = 0;
+
+		if (!pe_refresh)
+			video_refresh ();
+
+		vi_refresh ();
+	}
+}
+
+
+void hw_update (void)
+{
+		if (!audio_count--)
+		{
+			audio_count = AUDIO_COUNT;
+//			dsp_generate_interrupt (DSP_INTERRUPT_AID);
+			dsp_update ();
+		}
+		
+		if (!fifo_count--)
+		{
+			fifo_count = FIFO_COUNT;
+
+			video_input_check ();
+			si_update_devices ();
+//			dsp_update ();
+		}
+
+#if 0
+		if (!retrace_count--)
+		{
+			retrace_count = RETRACE_COUNT;
+# if 1
+			if (do_postretrace)
+			{
+				video_postretrace ();
+				do_postretrace = FALSE;
+			}
+			else
+			{
+				video_preretrace ();
+				do_postretrace = TRUE;
+			}
+# else
+			video_preretrace ();
+# endif
+		}
+#else
+	vid_refresh ();
+#endif
+}
+//////////////////////////////////////////////////////////////////////////////
+
+
 int hw_rword (__u32 address, __u32 *data)
 {
 	address &= 0xfffc;
@@ -281,7 +422,7 @@ void install_exception_handlers (void)
 		0x80090000,		// lwz r0, 0 (r9)
 		0x4c000064,		// rfi
 	};
-	int i;
+	unsigned int i;
 
 
 	for (i = 0; i < sizeof (reset_handler) / 4; i++)
@@ -319,6 +460,12 @@ void hw_set_video_mode (int country_code)
 }
 
 
+void hw_check_interrupts (void)
+{
+	dsp_check_interrupts ();
+}
+
+
 // after loading states
 void hw_reinit (void)
 {
@@ -338,6 +485,8 @@ void hw_reinit (void)
 
 void hw_init (void)
 {
+	zero_state ();
+
 	dsp_init ();
 	cp_init ();
 	di_init ();

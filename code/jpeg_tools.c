@@ -128,6 +128,8 @@ void jpeg_decompress_start (__u8 *src, __u32 size)
 
 	jpeg_memory_src (&cinfo, src, size);
 	jpeg_read_header (&cinfo, FALSE);
+	cinfo.image_width = 512;
+	cinfo.image_height = 416;
 }
 
 

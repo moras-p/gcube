@@ -13,8 +13,8 @@ double trunc (double);
 
 #include "general.h"
 #include "mem.h"
+#include "hw.h"
 #include "gdebug.h"
-
 
 // registers
 extern __u32 cpuregs[4096];
@@ -28,10 +28,15 @@ extern __u64 ps1[32];
 #define CPU_CLOCK_SPEED					486000000
 
 
-#define TBMAGIC									((__u64) 23 * 365 * 24 * 60 * 60 + 7 * 366 * 24 * 60 * 60)
-#define T2TICKS(t)							((t) * CPU_CLOCK_SPEED / 12)
-#define CALC_TBL								(TBL = T2TICKS ((__u64) time (NULL) - TBMAGIC))
-#define CALC_TBU								(TBU = T2TICKS ((__u64) time (NULL) - TBMAGIC) >> 32)
+#define CPU_REAL_TIME						0
+// -2 * 60 * 60 will differ depending on the timezone
+#define TBFIX										(2 * 60 * 60)
+#define TBMAGIC									((__u64) 23 * 365 * 24 * 60 * 60 + 7 * 366 * 24 * 60 * 60 - TBFIX)
+#define S2TICKS(s)							((__u64) CPU_CLOCK_SPEED / 12 * (s))
+#define GC_TIME_S								((__u64) time (NULL) - TBMAGIC)
+#define CALC_TB									(S2TICKS (GC_TIME_S))
+// r3 = vigetretracecount -> increased in __VIRetraceHandler
+// r3 - (r3 & 0xffffff80) -> value from 0 to 0x3f inc
 
 
 // opcodes
@@ -91,6 +96,7 @@ extern __u64 ps1[32];
 #define I_TBU		52
 #define TBL			(CPUREGS (I_TBL))
 #define TBU			(CPUREGS (I_TBU))
+#define TB			(*((__u64 *) &TBL))
 // special purpose registers (spr0-spr1023)
 #define I_SPR		1024
 #define SPR			(&CPUREGS (I_SPR))
@@ -549,7 +555,6 @@ extern __u64 ps1[32];
 #define PVR_REVISION_FIRST					0x0100
 #define PVR_REVISION								0xbabe
 
-extern int ref_delay;
 
 void hle_execute (__u32 op);
 void hle_reattach (__u32 op);
@@ -558,6 +563,8 @@ void hle_reattach (__u32 op);
 void cpu_init (void);
 void cpu_execute (void);
 void cpu_exception (__u32 ex);
+
+void cpu_exception_dont_advance (__u32 ex);
 
 
 #endif // __CPU_H

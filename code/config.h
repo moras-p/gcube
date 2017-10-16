@@ -16,6 +16,10 @@
 
 #define DEFAULT_TEXCACHE_SIZE				112
 
+#define DEFAULT_MEMCARD_SIZE				16
+#define DEFAULT_MEMCARD_A_NAME			"memcard_a.gmc"
+#define DEFAULT_MEMCARD_B_NAME			"memcard_b.gmc"
+
 #define INPUT_OFF						0
 #define INPUT_KEYBOARD1			1
 #define INPUT_KEYBOARD2			2
@@ -47,11 +51,17 @@ typedef struct
 	// gamepad axis mapping
 	int padamap[4][PADAMAP_SIZE];
 
+	// memory cards
+	int memcard_a_size;
+	int memcard_b_size;
+	char *memcard_a_name;
+	char *memcard_b_name;
+
 	// audio
 	int buffer_size;
 	
 	// texcache size
-	int texcache_size;
+	unsigned int texcache_size;
 
 	// map keyboard / gamepad index to player (0 means not mapped)
 	int keyboard[4];

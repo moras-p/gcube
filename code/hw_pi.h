@@ -51,7 +51,6 @@ void pi_init (void);
 void pi_reinit (void);
 void pi_check_for_interrupts (void);
 void pi_interrupt (__u32 mask, int set);
-void pi_interrupt_ex (__u32 mask, int set);
 
 
 #endif // __HW_PI_H

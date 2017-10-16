@@ -34,4 +34,5 @@ void gd_dis_close_unkop(void);
 void gd_dis_open_unkop(void);
 void gd_dis_mem (gd_globals_t *gdg, uint16 *mem, int size);
 void gd_dis_mem_fast (uint16 *mem, int size);
+
 int dsp_disassemble (char **buff, uint16 *mem);

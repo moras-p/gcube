@@ -4,8 +4,7 @@
 
 #include "general.h"
 #include "mem.h"
-#include "math.h"
-
+#include "mapdb.h"
 
 #define MAX_MAP_ITEMS				20480
 
@@ -59,6 +58,14 @@
 #define HLE_PARAM_6_PTR			(MEM_L2C_ADDRESS (GPR[8]))
 #define HLE_PARAM_7_PTR			(MEM_L2C_ADDRESS (GPR[9]))
 
+#define HLE_PARAM_1_PTR_F		((float *) MEM_L2C_ADDRESS (GPR[3]))
+#define HLE_PARAM_2_PTR_F		((float *) MEM_L2C_ADDRESS (GPR[4]))
+#define HLE_PARAM_3_PTR_F		((float *) MEM_L2C_ADDRESS (GPR[5]))
+#define HLE_PARAM_4_PTR_F		((float *) MEM_L2C_ADDRESS (GPR[6]))
+#define HLE_PARAM_5_PTR_F		((float *) MEM_L2C_ADDRESS (GPR[7]))
+#define HLE_PARAM_6_PTR_F		((float *) MEM_L2C_ADDRESS (GPR[8]))
+#define HLE_PARAM_7_PTR_F		((float *) MEM_L2C_ADDRESS (GPR[9]))
+
 #define HLE_RETURN(X)				({GPR[3] = (X); return;})
 #define HLE_RETURN_F(X)			({FPR[1] = (X); return;})
 
@@ -103,8 +110,9 @@ typedef struct
 	MapItem *items_by_mem[MEM_SIZE >> 2];
 
 	// by number
-	MapItem *items_by_num[MAX_MAP_ITEMS];
-	int nitems;
+//	MapItem *items_by_num[MAX_MAP_ITEMS];
+	MapItem **items_by_num;
+	int nitems, maxitems;
 } Map;
 
 
@@ -204,10 +212,10 @@ MapItem *map_add_item (Map *map, __u32 address, __u32 size, char *name);
 void map_remove_item (Map *map, MapItem *mi);
 void map_item_modify (MapItem *mi, __u32 address, __u32 size, char *name);
 Map *map_create (char *filename);
+Map *map_create_size (char *filename, int nitems);
 void map_destroy (Map *map);
 Map *map_load_full (char *filename);
 Map *map_load (char *filename);
-Map *map_extract_db (const char *m);
 int map_save (Map *map, char *filename);
 MapItem *map_get_item_by_name (Map *map, char *name);
 MapItem *map_get_item_by_address (Map *map, __u32 address);
@@ -217,10 +225,12 @@ MapItem *map_find_item_by_crc (Map *map, __u32 crc, MapItem *start);
 void map_item_generate_db (MapItem *mi);
 void map_generate_db (Map *map);
 int map_save_db (Map *map, char *filename);
-Map *map_load_db (char *filename);
+
+MapDBItem *mdb_load (char *filename);
+void mdb_destroy (MapDBItem *mdb);
 
 Map *map_generate_nameless (void);
-void map_generate_names (Map *map, Map *db);
+void map_generate_names (Map *map, MapDBItem *db);
 
 void map_item_emulation (MapItem *mi, int stat, unsigned int hle_num);
 int map_item_emulation_hle (MapItem *mi);

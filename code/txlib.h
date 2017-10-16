@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-
 // if the window gets larger than this value... boom!
 #define MAX_ALLOCATED		160
 #define LINE_WIDTH			80
@@ -53,10 +52,12 @@
 
 
 #ifdef GDEBUG
-#include <curses.h>
 # ifdef WINDOWS
+# include <ncurses/curses.h>
 #  define use_default_colors()		({})
 #  define assume_default_colors(a,b)	({})
+# else
+#  include <ncurses.h>
 # endif
 
 # define ATTRIB_BOLD					A_BOLD

@@ -61,12 +61,13 @@ void window_print_a (char *string, int attributes)
 
 int textmode_lib_init (void)
 {
-//	newterm (NULL, stdout, stdin);
+	//newterm (NULL, stdout, stdin);
 
 	initscr ();
-	cbreak ();
-	noecho ();
-	nonl ();
+	printw("hello world\n");
+	//cbreak ();
+	//noecho ();
+	//nonl ();
 	keypad (stdscr, TRUE);
 
 	return TRUE;
@@ -274,7 +275,7 @@ Window *window_create (int x, int y, int nlines, char *title)
 		return NULL;
 	
 	
-	win = calloc (1, sizeof (Window));
+	win = (Window *) calloc (1, sizeof (Window));
 	win->x = x;
 	win->y = y;
 	win->nlines = (nlines > MAX_LINES) ? (MAX_LINES) : nlines;
@@ -288,11 +289,11 @@ Window *window_create (int x, int y, int nlines, char *title)
 
 	for (i = 0; i < MAX_ALLOCATED; i++)
 	{
-		win->lines[i] = malloc (LINE_WIDTH + 1);
+		win->lines[i] = (char *) malloc (LINE_WIDTH + 1);
 		memset (win->lines[i], ' ', LINE_WIDTH);
 		win->lines[i][LINE_WIDTH] = '\0';
 		
-		win->attributes[i] = malloc (LINE_WIDTH * sizeof (int));
+		win->attributes[i] = (int *) malloc (LINE_WIDTH * sizeof (int));
 		memset (win->attributes[i], win->default_attributes, LINE_WIDTH * sizeof (int));
 	}
 	
@@ -633,14 +634,14 @@ void screen_select_window (Screen *screen, int dir)
 
 void window_add_scroll_callback (Window *win, void *callback, void *data)
 {
-	win->scroll_callback = callback;
+	win->scroll_callback = (void (*) (struct WindowTag *, int, int, void *)) callback;
 	win->scroll_data = data;
 }
 
 
 void window_add_size_change_callback (Window *win, void *callback, void *data)
 {
-	win->size_change_callback = callback;
+	win->size_change_callback = (void (*) (struct WindowTag *, int, void *)) callback;
 	win->size_change_data = data;
 }
 
@@ -891,7 +892,7 @@ void screen_redraw_window (Screen *screen, Window *win)
 
 void window_add_keypress_callback (Window *win, void *callback, void *data)
 {
-	win->keypress_callback = callback;
+	win->keypress_callback = (int (*) (struct WindowTag *, int, int, void *)) callback;
 	win->keypress_data = data;
 }
 
@@ -907,21 +908,21 @@ int window_handle_keypress (Window *win, int key, int modifiers)
 
 void window_add_refresh_callback (Window *win, void *callback, void *data)
 {
-	win->refresh_callback = callback;
+	win->refresh_callback = (void (*) (struct WindowTag *, void *)) callback;
 	win->refresh_data = data;
 }
 
 
 void screen_add_keypress_callback (Screen *screen, void *callback, void *data)
 {
-	screen->keypress_callback = callback;
+	screen->keypress_callback = (int (*) (struct ScreenTag *, int, int, void *)) callback;
 	screen->keypress_data = data;
 }
 
 
 void screen_add_unhandled_keypress_callback (Screen *screen, void *callback, void *data)
 {
-	screen->unhandled_keypress_callback = callback;
+	screen->unhandled_keypress_callback = (int (*) (struct ScreenTag *, int, int, void *)) callback;
 	screen->unhandled_keypress_data = data;
 }
 
@@ -946,7 +947,7 @@ void screen_set_cursor_relative (Screen *screen, Window *win, int x, int y)
 
 void window_add_enter_callback (Window *win, void *callback, void *data)
 {
-	win->enter_callback = callback;
+	win->enter_callback = (void (*) (struct WindowTag *, void *)) callback;
 	win->enter_data = data;
 }
 

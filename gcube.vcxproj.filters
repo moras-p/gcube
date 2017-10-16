@@ -141,6 +141,15 @@
     <ClInclude Include="code\timer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="code\cg.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\mapdb.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="code\ax.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="code\audio_sdl.c">
@@ -272,13 +281,19 @@
     <ClCompile Include="code\gl_ext_.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="code\ppc_disasm.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="code\scandir.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="code\timer_sdl.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\cg.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\cg_vertex.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\gcmap.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="code\tplx.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -290,6 +305,9 @@
     <None Include="Makefile.win" />
     <None Include="README.md" />
     <None Include="README.info" />
+    <None Include="code\cg_fragment.cg">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="code\res.rc">

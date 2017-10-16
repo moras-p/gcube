@@ -151,7 +151,7 @@ extern int controller_type[4];
 #define SI_INTERRUPT_TC			(1 << 0)
 #define SI_INTERRUPT_RDST		(1 << 1)
 
-
+#pragma pack(1)
 struct PADStatusTag
 {
 	__u16 buttons;

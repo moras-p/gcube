@@ -16,11 +16,13 @@
 #define GL_TEXTURE_RECT 		0x84f5
 //#define GL_TEXTURE_RECT 	GL_TEXTURE_2D
 #define VID_BPP						32
+#define VID_BPP_FB				24
 
 #define VIDEO_WIDTH				(ewidth ? ewidth : 640)
 #define VIDEO_HEIGHT			(eheight ? eheight : 480)
 
-extern int screen_width, screen_height;
+extern unsigned int screen_width, screen_height;
+extern unsigned int cnt_ar, cnt_di;
 
 
 int video_init (int w, int h);

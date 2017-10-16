@@ -81,6 +81,7 @@
 #define LOG_ENABLE_GX							0x00040000
 #define LOG_ENABLE_HLE						0x00080000
 #define LOG_ENABLE_CALLS					0x00100000
+#define LOG_ENABLE_MC							0x00200000
 
 #define LOG_ENABLE_ALL						(LOG_ENABLE_INT | LOG_ENABLE_AI | LOG_ENABLE_DSP | LOG_ENABLE_CP | LOG_ENABLE_DI | LOG_ENABLE_EXI | LOG_ENABLE_MI | LOG_ENABLE_PE | LOG_ENABLE_PI | LOG_ENABLE_SI | LOG_ENABLE_VI | LOG_ENABLE_GX)
 
@@ -94,7 +95,7 @@
 typedef struct
 {
 	char buff[LINE_WIDTH+1];
-	int pos;
+	unsigned int pos;
 	char *history[MAX_HISTORY_LINES+1];
 	int hlines;
 	int hpos;
@@ -115,6 +116,7 @@ typedef struct
 #define DIR_ITEM_DIRECTORY		1
 #define DIR_ITEM_EXECUTABLE		2
 #define DIR_ITEM_GCM					3
+#define DIR_ITEM_GCI					4
 
 typedef struct
 {
@@ -185,14 +187,14 @@ typedef struct
 	int compress_states;
 	unsigned int refresh_delay;
 	unsigned int min_refresh;
-	int output_code_lines;
+	unsigned int output_code_lines;
 	__u32 result;
 	
 	Breakpoint *breakpoints[0x05ffffff];
-	int nbreakpoints;
+	unsigned int nbreakpoints;
 	int break_on_exception;
 	Breakpoint *hwbreakpoints[0xffff];
-	int nhwbreakpoints;
+	unsigned int nhwbreakpoints;
 	int break_on_uhw_read;
 	int break_on_uhw_write;
 	Breakpoint *bpbynum[MAX_BREAKPOINTS];
@@ -201,11 +203,11 @@ typedef struct
 
 	int code_cmd_input;
 	char code_cmd[LINE_WIDTH];
-	int hcodepos;
+	unsigned int hcodepos;
 	
 	int colors;
 
-	int log_enable;
+	unsigned int log_enable;
 } DebuggerState;
 
 

@@ -53,7 +53,9 @@ void pi_w32_intsr (__u32 addr, __u32 data)
 
 void pi_w32_intmskr (__u32 addr, __u32 data)
 {
+#ifdef GDEBUG
 	gdebug_print_intmask (data, "..pi: INTMASK ");
+#endif
 
 	INTMR = data;
 	pi_check_for_interrupts ();
@@ -80,8 +82,12 @@ void delayed_interrupt_set (int num, int delay)
 {
 	if (delayed_ints[num] > 0)
 	{
+		if (num == 2)
 			INTSR |= INTERRUPT_DI;
-			pi_check_for_interrupts ();
+		else if (num == 4)
+			INTSR |= INTERRUPT_DSP;
+
+		pi_check_for_interrupts ();
 	}
 
 	delayed_ints[num] = delay;
@@ -99,11 +105,21 @@ void delayed_interrupt_check (void)
 			INTSR |= INTERRUPT_DI;
 		}
 	}
+	else if (delayed_ints[4] > 0)
+	{
+		if (!--delayed_ints[4])
+		{
+			delayed_ints[4] = -1;
+			INTSR |= INTERRUPT_DSP;
+		}
+	}
 }
 
 
 void pi_check_for_interrupts (void)
 {
+	hw_check_interrupts ();
+
 	delayed_interrupt_check ();
 	if ((INTSR & INTMR) && (MSR & MSR_EE))
 	{
@@ -118,8 +134,16 @@ void pi_interrupt (__u32 mask, int set)
 	if (set && (mask == INTERRUPT_DI))
 	{
 		delayed_interrupt_set (2, 6000);
+//		delayed_interrupt_set (2, 500000);
 		return;
 	}
+#if 0
+	else if (set && (mask == INTERRUPT_DSP))
+	{
+		delayed_interrupt_set (4, 6000);
+		return;
+	}
+#endif
 
 	if (set)
 		INTSR |= mask;
@@ -127,34 +151,6 @@ void pi_interrupt (__u32 mask, int set)
 		INTSR &= ~mask;
 
 	pi_check_for_interrupts ();
-}
-
-
-void pi_interrupt_ex (__u32 mask, int set)
-{
-/*
-	if (set)
-	{
-		if (!(INTSR & mask))
-			printf ("ex interrupt set: %.8x\n", mask);
-	}
-	else
-	{
-		if (INTSR & mask)
-			printf ("ex interrupt cleared: %.8x\n", mask);
-	}
-*/
-
-	if (set)
-		INTSR |= mask;
-	else
-		INTSR &= ~mask;
-
-	if (MSR & MSR_EE)
-	{
-		PC -= 4;
-		cpu_exception (EXCEPTION_EXTERNAL + 4);
-	}
 }
 
 

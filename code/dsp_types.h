@@ -1,5 +1,5 @@
-#ifndef __DTYPES_H
-#define __DTYPES_H 1
+#ifndef __DSPTYPES_H
+#define __DSPTYPES_H 1
 
 typedef unsigned char	uint8;
 typedef unsigned short	uint16;
@@ -17,7 +17,8 @@ typedef const uint32 cuint32;
 #define false 0
 #define true !false
 
+#ifndef __cplusplus
 typedef unsigned int bool;
-
+#endif
 
 #endif

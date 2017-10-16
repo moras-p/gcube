@@ -95,7 +95,7 @@ void log_close (void)
 
 char *get_filename (char *name, const char *path)
 {
-	char *c;
+	const char *c;
 
 
 	c = strrchr (path, '/');
@@ -117,7 +117,7 @@ char *get_filename (char *name, const char *path)
 
 char *get_path (char *path, const char *name)
 {
-	char *c;
+	const char *c;
 
 
 	c = strrchr (name, '/');
@@ -187,7 +187,7 @@ __u32 round_up (__u32 a, __u32 b)
 }
 
 
-inline int is_power_of_two (__u32 a)
+int is_power_of_two (__u32 a)
 {
 	int i = 0;
 
@@ -205,9 +205,9 @@ inline int is_power_of_two (__u32 a)
 }
 
 
-int closest_upper_power_of_two (__u32 a)
+unsigned int closest_upper_power_of_two (__u32 a)
 {
-	int i = 1;
+	unsigned int i = 1;
 
 
 	while (i < a)
@@ -420,10 +420,23 @@ char *f2str (const char *filename)
 	size = ftell (f);
 	rewind (f);
 	
-	str = malloc (size + 1);
+	str = (char *) malloc (size + 1);
 	fread (str, 1, size, f);
 	str[size] = '\0';
 	fclose (f);
 	
 	return str;
+}
+
+
+void file_cat (const char *filename, void *data, __u32 size)
+{
+	FILE *f = fopen (filename, "ab");
+	
+	
+	if (!f)
+		return;
+
+	fwrite (data, 1, size, f);
+	fclose (f);
 }

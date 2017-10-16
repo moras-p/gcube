@@ -1,5 +1,5 @@
 
-static const unsigned char cg_vertex_str[] =
+static const char cg_vertex_str[] =
 {
   "\n"
   "struct vpin\n"

@@ -23,6 +23,7 @@
  */
 
 #include <SDL/SDL_opengl.h>
+
 #include "hw_gx.h"
 
 
@@ -50,11 +51,11 @@ static int ignore_bad_displaylist = TRUE;
 */
 # define GPOPCODE_SIZE(X)
 
-
 int gx_parse_list (__u32 start, __u32 length)
 {
 	__u32 end = start + length;
 	int n;
+
 
 	DEBUG (EVENT_LOG_GX_IMM, "..gx: parsing list (start = %.8x, length = %.8x)", start | 0x80000000, length);
 
@@ -110,7 +111,7 @@ GPOPCODE (LOAD_XF)
 {
 	__u32 n = FIFO_U16 (mem += 1) + 1;
 	__u32 a = FIFO_U16 (mem += 2);
-	int i;
+	unsigned int i;
 
 //#if 1
 	// primary check
@@ -412,7 +413,7 @@ GPOPCODE (LOAD_INDEX)
 	// index = t >> 16;
 	__u32 n = ((t >> 12) & 0x0f) + 1;
 	__u32 a = t & 0x0fff;
-	int i = ((FIFO_U8 (mem) >> 3) & 3) + 0x0c;		// array index
+	unsigned int i = ((FIFO_U8 (mem) >> 3) & 3) + 0x0c;		// array index
 
 
 	GPOPCODE_SIZE (5);
@@ -438,7 +439,7 @@ GPOPCODE (CALL_DISPLAYLIST)
 
 	GPOPCODE_SIZE (9);
 
-	DEBUG (EVENT_LOG_GX, "....  call displaylist %.8x of size %.8x", addr, size);
+	DEBUG (EVENT_LOG_GX, "....  call displaylist %.8x of size %.8x from %.8x", addr, size, mem);
 
 	if (((addr & MEM_MASK) > MEM_SIZE) || (addr & 31) || (size & 31))
 	{

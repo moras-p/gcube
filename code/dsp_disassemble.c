@@ -110,7 +110,7 @@ pdlabel_t regnames[] =
 char tmpstr[12];
 char * pdname(uint16 val)
 {
-	int i;
+	unsigned int i;
 	for(i = 0 ; i < sizeof(pdlabels)/sizeof(pdlabel_t) ; i++)
 	{
 		if (pdlabels[i].addr == val)

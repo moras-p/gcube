@@ -23,8 +23,10 @@
  */
 
 #include <SDL/SDL_opengl.h>
+
 #include "hw_gx.h"
 #include "gl_ext.h"
+#include "gx_cunpacks.h"
 
 // if set, one texture can use only one tlut at a time
 // correct in Warioware Inc (otherwise needs reloading textures after minigame starts)
@@ -686,8 +688,7 @@ void gx_convert_texture_ci14x2_rgba (__u8 *data, int width, int height, __u16 *t
 }
 
 
-
-__u32 icolor (__u32 a, __u32 b, float fa, float fb, float fc)
+inline __u32 icolor (__u32 a, __u32 b, int fa, int fb)
 {
 	__u8 *aa = (__u8 *) &a;
 	__u8 *bb = (__u8 *) &b;
@@ -696,7 +697,7 @@ __u32 icolor (__u32 a, __u32 b, float fa, float fb, float fc)
 
 
 	for (i = 0; i < 4; i++)
-		cc[i] = ((__u32) aa[i]*fa + (__u32) bb[i]*fb) / fc;
+		cc[i] = (((__u32) aa[i]*fa + bb[i]*fb) / 6);
 
 	return (*(__u32 *) cc);
 }
@@ -730,13 +731,13 @@ void gx_convert_texture_cmp_rgba (__u8 *data, int width, int height, __u16 *tlut
 
 					if (BSWAP16 (src[0]) > BSWAP16 (src[1]))
 					{
-						rgb[2] = icolor (rgb[0], rgb[1], 2, 1, 3) | MASK_ALPHA;
-						rgb[3] = icolor (rgb[1], rgb[0], 2, 1, 3) | MASK_ALPHA;
+						rgb[2] = icolor (rgb[0], rgb[1], 4, 2) | MASK_ALPHA;
+						rgb[3] = icolor (rgb[1], rgb[0], 4, 2) | MASK_ALPHA;
 					}
 					else
 					{
-						rgb[2] = icolor (rgb[0], rgb[1], 0.5, 0.5, 1) | MASK_ALPHA;
-						rgb[3] = icolor (rgb[1], rgb[0], 2, 1, 3) &~ MASK_ALPHA;
+						rgb[2] = icolor (rgb[0], rgb[1], 3, 3) | MASK_ALPHA;
+						rgb[3] = icolor (rgb[1], rgb[0], 4, 2) &~ MASK_ALPHA;
 					}
 
 					// color selection (00, 01, 10, 11)
@@ -876,8 +877,8 @@ void gx_bind_texture (unsigned int index, TextureTag *tag)
 }
 
 
-char *gx_convert_texture (__u8 *address, int width, int height, int format,
-													__s16 *tlut_address, int tlut_format)
+__u8 *gx_convert_texture (__u8 *address, int width, int height, int format,
+													__u16 *tlut_address, int tlut_format)
 {
 	TexFormat tf;
 
@@ -989,18 +990,18 @@ void gx_dump_active_texture (int index, int lod)
 						 address | 0x80000000, texactive[index]->format);
 
 	texconvert_rgba[texactive[index]->format] (
-													MEM_ADDRESS (address), width, height,
-													(__s16 *) TMEM_ADDRESS (texactive[index]->tlut_address),
+													(__u8 *) MEM_ADDRESS (address), width, height,
+													(__u16 *) TMEM_ADDRESS (texactive[index]->tlut_address),
 													texactive[index]->tlut_format,
 													&tf);
 
-	video_dump_texture (fname, texbuff, width, height);
+	video_dump_texture (fname, (char *) texbuff, width, height);
 }
 
 
 void texcache_tlut_reload (__u32 tlut_address)
 {
-	int i;
+	unsigned int i;
 
 
 	for (i = 0; i < texcache.ntags; i++)
@@ -1017,7 +1018,7 @@ int tex_in_texcache (__u32 address)
 
 void tex_invalidate (__u32 address)
 {
-	int i;
+	unsigned int i;
 
 
 	for (i = 0; i < texcache.ntags; i++)
@@ -1059,7 +1060,7 @@ void texcache_tag_invalidate (TextureTag *tag)
 
 void texcache_invalidate_all (void)
 {
-	int i;
+	unsigned int i;
 	
 
 	for (i = 0; i < texcache.ntags; i++)
@@ -1091,7 +1092,7 @@ void texcache_remove_all (void)
 
 void texcache_remove_unused (void)
 {
-	int i;
+	unsigned int i;
 	__u32 max_misses = 0, victim = 0;
 
 
@@ -1167,9 +1168,9 @@ TextureTag *texcache_add_tag (__u32 address, __u32 tlut_address,
 }
 
 
-TextureTag *texcache_fetch (__u32 address, __u32 tlut_address, int width, int height)
+TextureTag *texcache_fetch (__u32 address, __u32 tlut_address, __u32 width, __u32 height)
 {
-	int i;
+	unsigned int i;
 
 
 	for (i = 0; i < texcache.ntags; i++)
@@ -1253,7 +1254,7 @@ void texcache_rt_remove_all (void)
 
 TextureTag *texcache_rt_fetch (__u32 address, __u32 width, __u32 height)
 {
-	int i;
+	unsigned int i;
 
 
 	for (i = 0; i < texcache_rt.ntags; i++)
@@ -1275,7 +1276,7 @@ int gx_render_target_num (__u32 address)
 	__u32 n = MEM32 (address) - XFB_MAGIC (0);
 	
 
-	return (n < MAX_RT_TYPES) ? n : -1;
+	return (n < MAX_RT_TYPES) ? (int) n : -1;
 }
 
 
@@ -1291,7 +1292,7 @@ TextureTag *gx_get_render_target (__u32 address, __u32 width, __u32 height)
 }
 
 
-inline int gx_is_tex_p2 (int n)
+int gx_is_tex_p2 (int n)
 {
 	if (texactive[n])
 		return texactive[n]->p2;
@@ -1306,8 +1307,8 @@ void gx_load_texture (unsigned int index)
 	__u32 address = TEX_IMAGE_BASE (index);
 	__u32 tlut_address = TLUT_TMEM_BASE (index);
 	int format = TEX_FORMAT (index);
-	int width = TEX_WIDTH (index);
-	int height = TEX_HEIGHT (index);
+	unsigned int width = TEX_WIDTH (index);
+	unsigned int height = TEX_HEIGHT (index);
 	int tlut_format = TLUT_FORMAT (index);
 	float min_lod = ((float) TEX_MODE_MIN_LOD (index)) / 16;
 	float max_lod = ((float) TEX_MODE_MAX_LOD (index)) / 16;
@@ -1395,9 +1396,9 @@ void gx_load_texture (unsigned int index)
 			texcache_tag_invalidate (tag);
 
 			// convert base image
-			texconvert[format] (MEM_ADDRESS (address),
+			texconvert[format] ((__u8 *) MEM_ADDRESS (address),
 													width, height,
-													(__s16 *) TMEM_ADDRESS (tlut_address),
+													(__u16 *) TMEM_ADDRESS (tlut_address),
 													tlut_format,
 													&tf);
 	
@@ -1419,9 +1420,9 @@ void gx_load_texture (unsigned int index)
 					if (height > 1)
 						height >>= 1;
 
-					texconvert[format] (MEM_ADDRESS (address),
+					texconvert[format] ((__u8 *) MEM_ADDRESS (address),
 															width, height,
-															(__s16 *) TMEM_ADDRESS (tlut_address),
+															(__u16 *) TMEM_ADDRESS (tlut_address),
 															tlut_format,
 															&tf);
 
@@ -1455,9 +1456,9 @@ void gx_load_texture (unsigned int index)
 #endif
 
 	// convert base image
-	texconvert[format] (MEM_ADDRESS (address),
+	texconvert[format] ((__u8 *) MEM_ADDRESS (address),
 											width, height,
-											(__s16 *) TMEM_ADDRESS (tlut_address),
+											(__u16 *) TMEM_ADDRESS (tlut_address),
 											tlut_format,
 											&tf);
 	// load texture
@@ -1499,9 +1500,9 @@ void gx_load_texture (unsigned int index)
 			if (height > 1)
 				height >>= 1;
 
-			texconvert[format] (MEM_ADDRESS (address),
+			texconvert[format] ((__u8 *) MEM_ADDRESS (address),
 													width, height,
-													(__s16 *) TMEM_ADDRESS (tlut_address),
+													(__u16 *) TMEM_ADDRESS (tlut_address),
 													tlut_format,
 													&tf);
 
@@ -1547,7 +1548,7 @@ void gx_render_to_texture (__u32 address, unsigned int x, unsigned int y,
 {
 	TextureTag *tag = texcache_rt_fetch (address, mipmap ? w/2 : w, mipmap ? h/2 : h);
 	__u8 *buffer = texbuff;
-	int i;
+	unsigned int i;
 
 
 	if (h > screen_height)

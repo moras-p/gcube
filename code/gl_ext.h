@@ -4,7 +4,7 @@
 #include <SDL/SDL_opengl.h>
 #include <stdio.h>
 
-#ifdef WINDOWS
+#ifdef LOAD_GLEXT
 extern PFNGLACTIVETEXTUREARBPROC glActiveTextureARB;
 extern PFNGLMULTITEXCOORD4FARBPROC glMultiTexCoord4fARB;
 extern PFNGLVERTEXATTRIB4FVARBPROC glVertexAttrib4fvARB;
@@ -23,6 +23,8 @@ extern float glmat[16];
 float *gl_get_texmat (void);
 float *gl_get_projmat (void);
 float *gl_get_mvmat (void);
+
+int gl_load_ext (void);
 
 
 #endif //__GL_EXT_H

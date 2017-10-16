@@ -46,9 +46,11 @@ int fb_set = FALSE;
 int fullscreen = FALSE;
 int catch_frames = FALSE;
 int save_screenshot = FALSE;
-int screen_width = 0, screen_height = 0;
+unsigned int screen_width = 0, screen_height = 0;
 extern int use_textures, use_colors;
 int fsaa = 0;
+unsigned int cnt_ar = 0, cnt_di = 0;
+
 
 // buffer for screenshots
 __u32 sbuff[640 * 528];
@@ -86,7 +88,7 @@ int video_init_fb (int w, int h)
 {
 	if (offscreen)
 		SDL_FreeSurface (offscreen);
-	offscreen = SDL_CreateRGBSurface (SDL_HWSURFACE, w, h, VID_BPP,
+	offscreen = SDL_CreateRGBSurface (SDL_HWSURFACE, w, h, VID_BPP_FB,
 																		0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000);
 	if (!offscreen)
 	{
@@ -100,7 +102,7 @@ int video_init_fb (int w, int h)
 
 		SDL_FreeYUVOverlay (yuv);
 		yuv = SDL_CreateYUVOverlay (w, h, SDL_YUY2_OVERLAY, offscreen);
-		yuv->pixels[0] = pixels;
+		yuv->pixels[0] = (Uint8 *) pixels;
 	}
 	else
 		yuv = SDL_CreateYUVOverlay (w, h, SDL_YUY2_OVERLAY, offscreen);
@@ -178,6 +180,8 @@ int video_init (int w, int h)
 			fprintf (stderr, "SDL initialization failed: %s\n", SDL_GetError ());
 			return FALSE;
 		}
+		freopen("CON", "w", stdout);
+		freopen("CON", "w", stderr);
 	}
 
 	SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 8);
@@ -206,12 +210,10 @@ int video_init (int w, int h)
 	SDL_ShowCursor (!fullscreen);
 
 	// check for extensions
-	if (!strstr (glGetString (GL_EXTENSIONS), "_texture_rectangle"))
+	if (!strstr ((const char *) glGetString (GL_EXTENSIONS), "_texture_rectangle"))
 		gcube_quit ("Textured rectangle extension is not supported by Your video card!");
 
-#ifdef WINDOWS
 	gl_load_ext ();
-#endif
 
 	glGetFloatv (GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &max_anisotropy);
 	gx_set_max_anisotropy (max_anisotropy);
@@ -432,6 +434,7 @@ void video_draw_fb (void)
 void video_draw (void)
 {
 	char buff[256];
+	float fps = count_fps ();
 
 
 	SDL_GL_SwapBuffers ();
@@ -440,7 +443,7 @@ void video_draw (void)
 	if (save_screenshot)
 		video_save_screenshot ();
 
-	sprintf (buff, "fps: %.2f", count_fps ());
+	sprintf (buff, "fps: %.2f (%x.%x)", fps, cnt_di & 15, cnt_ar & 15);
 	video_set_title (buff);
 }
 
@@ -571,6 +574,11 @@ void input_check (void)
 						video_draw_efb ();
 						break;
 
+					case SDLK_EQUALS:
+						SDL_GL_SwapBuffers ();
+						video_set_title ("forced buffer swap");
+						break;
+
 					default:
 						break;
 				}
@@ -590,7 +598,7 @@ void input_check (void)
 
 					default:
 						{
-							int i, j;
+							unsigned int i, j;
 						
 							for (j = 0; j < 4; j++)
 								if (config->keyboard[j])
@@ -715,7 +723,7 @@ void video_set_framebuffer (unsigned char *addr)
 	fb_set = TRUE;
 }
 
-
+#pragma pack(1)
 struct TGAHeaderTag
 {
 	__u8 idlen;

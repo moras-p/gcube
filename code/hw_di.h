@@ -64,7 +64,7 @@ extern __u8 rdi[RDI_SIZE];
 typedef struct DirItemTag
 {
 	int type;
-	unsigned char *name;
+	char *name;
 	
 	unsigned int offset;
 	unsigned int size;
@@ -131,6 +131,8 @@ void boot_apploader (void);
 int is_gcm (char *filename);
 
 int mdvd_get_country_code (void);
+
+void di_read_stream (void *dst, __u32 offset, __u32 size);
 
 
 #endif // __HW_DI_H

@@ -23,6 +23,7 @@
  */
 
 #include <SDL/SDL_opengl.h>
+
 #include "hw_gx.h"
 #include "gl_ext.h"
 
@@ -55,7 +56,7 @@ int gx_get_real_width (void)
 	if (ewidth)
 		return ewidth;
 	else
-		return (((XF_VIEWPORT_A * 2) < RVI16 (0x2070)) ? RVI16 (0x2070) : (XF_VIEWPORT_A * 2));
+		return ((int) ((XF_VIEWPORT_A * 2) < RVI16 (0x2070)) ? RVI16 (0x2070) : (XF_VIEWPORT_A * 2));
 }
 
 
@@ -425,7 +426,7 @@ void gx_set_alphafunc (void)
 		GL_GEQUAL,
 		GL_ALWAYS,
 	};
-	int en;
+	int en, op, ref;
 
 
 	DEBUG (EVENT_LOG_GX, "....  TEV_ALPHAFUNC OP0 %d/%.3f LOGIC %d OP1 %d/%.3f",
@@ -442,11 +443,71 @@ void gx_set_alphafunc (void)
 	switch (TEV_ALPHAFUNC_LOGIC)
 	{
 		case GX_AOP_AND:
-			en = (TEV_ALPHAFUNC_OP0 != GX_ALWAYS) && (TEV_ALPHAFUNC_OP1 == GX_ALWAYS);
+			if ((TEV_ALPHAFUNC_OP0 == GX_ALWAYS) ||
+					((TEV_ALPHAFUNC_OP0 == TEV_ALPHAFUNC_OP1) &&
+					(TEV_ALPHAFUNC_A0 == TEV_ALPHAFUNC_A1)))
+			{
+				op = TEV_ALPHAFUNC_OP1;
+				ref = TEV_ALPHAFUNC_A1;
+				en = TRUE;
+			}
+			else if (TEV_ALPHAFUNC_OP1 == GX_ALWAYS)
+			{
+				op = TEV_ALPHAFUNC_OP0;
+				ref = TEV_ALPHAFUNC_A0;
+				en = TRUE;
+			}
+			else
+				en = FALSE;
 			break;
 		
 		case GX_AOP_OR:
-			en = (TEV_ALPHAFUNC_OP0 != GX_ALWAYS) && (TEV_ALPHAFUNC_OP1 == GX_NEVER);
+			if (((TEV_ALPHAFUNC_OP0 != GX_NEVER) && (TEV_ALPHAFUNC_OP1 == GX_NEVER)) ||
+					((TEV_ALPHAFUNC_OP0 == TEV_ALPHAFUNC_OP1) &&
+					(TEV_ALPHAFUNC_A0 == TEV_ALPHAFUNC_A1)))
+			{
+				op = TEV_ALPHAFUNC_OP0;
+				ref = TEV_ALPHAFUNC_A0;
+				en = TRUE;
+			}
+			else if ((TEV_ALPHAFUNC_OP0 == GX_NEVER) && (TEV_ALPHAFUNC_OP1 != GX_NEVER))
+			{
+				op = TEV_ALPHAFUNC_OP1;
+				ref = TEV_ALPHAFUNC_A1;
+				en = TRUE;
+			}
+			else
+				en = FALSE;
+			break;
+
+		case GX_AOP_XOR:
+			if (TEV_ALPHAFUNC_OP0 == GX_NEVER)
+			{
+				op = TEV_ALPHAFUNC_OP1;
+				ref = TEV_ALPHAFUNC_A1;
+				en = TRUE;
+			}
+			else if (TEV_ALPHAFUNC_OP1 == GX_NEVER)
+			{
+				op = TEV_ALPHAFUNC_OP0;
+				ref = TEV_ALPHAFUNC_A0;
+				en = TRUE;
+			}
+			// add check: if opA == always -> !opB
+			else
+				en = FALSE;
+			break;
+
+		case GX_AOP_XNOR:
+			if (((TEV_ALPHAFUNC_OP0 == TEV_ALPHAFUNC_OP1) &&
+					(TEV_ALPHAFUNC_A0 == TEV_ALPHAFUNC_A1)))
+			{
+				op = TEV_ALPHAFUNC_OP1;
+				ref = TEV_ALPHAFUNC_A1;
+				en = TRUE;
+			}
+			else
+				en = FALSE;
 			break;
 		
 		default:
@@ -454,11 +515,12 @@ void gx_set_alphafunc (void)
 	}
 
 	if (en)
+	{
+		glAlphaFunc (alphafunc[op], (float) ref / 0xff);
 		glEnable (GL_ALPHA_TEST);
+	}
 	else
 		glDisable (GL_ALPHA_TEST);
-
-	glAlphaFunc (alphafunc[TEV_ALPHAFUNC_OP0], (float) TEV_ALPHAFUNC_A0 / 0xff);
 }
 
 
@@ -773,5 +835,5 @@ void gx_copy_efb (void)
 	}
 	
 	// fix this
-	force_refresh ();
+	hw_force_vi_refresh ();
 }

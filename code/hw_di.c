@@ -34,8 +34,11 @@ __u8 rdi[RDI_SIZE];
 
 
 MiniDVDImage mdvd;
+static ADPStream adpstream;
+
 
 unsigned int mdvd_read_fixed (void *dest, unsigned int size);
+unsigned int mdvd_read_fixed_noseek (void *dest, __u32 size, __u32 ofs);
 
 
 __u32 di_r32_direct (__u32 addr)
@@ -130,7 +133,11 @@ void di_w32_cfg (__u32 addr, __u32 data)
 
 void di_execute_command (void)
 {
-	switch (RDI32 (DI_CMDBUF0))
+	// cc 11 2222
+	// cc - command
+	// 11 - subcommand 1
+	// 22 - subcommand 2
+	switch (RDI32 (DI_CMDBUF0) & 0xff00ffff)
 	{
 		// drive info
 		case 0x12000000:
@@ -152,6 +159,22 @@ void di_execute_command (void)
 
 			mdvd_seek (RDI32 (DI_CMDBUF1) << 2);
 //			mdvd_read (MEM_ADDRESS (RDI32 (DI_MAR) & 0x03ffffff), RDI32 (DI_LENGTH) & 0x03ffffff);
+
+if (1)
+{
+	__u32 pa;
+	if (!mmu_effective_to_physical (&pa, RDI32 (DI_MAR), TRUE, FALSE))
+		printf ("mmu error on di read\n");
+/*
+	else if (pa != (RDI32 (DI_MAR) & 0x03ffffff))
+	{
+		printf ("physical != effective (%8.8x != %8.8x)\n", pa, RDI32 (DI_MAR));
+		DEBUG (EVENT_LOG, "hw di problem");
+	}
+*/
+	mdvd_read_fixed (MEM_ADDRESS (pa & 0x03ffffff), RDI32 (DI_LENGTH) & 0x03ffffff);
+}
+else
 			mdvd_read_fixed (MEM_ADDRESS (RDI32 (DI_MAR) & 0x03ffffff), RDI32 (DI_LENGTH) & 0x03ffffff);
 			RDI32 (DI_LENGTH) = 0;
 			break;
@@ -165,16 +188,57 @@ void di_execute_command (void)
 		// request error
 		case 0xe0000000:
 			DEBUG (EVENT_LOG_DI, "....  CMD request error");
+	printf ("request error\n");
 			break;
 		
 		// play audio stream
 		case 0xe1000000:
-			DEBUG (EVENT_LOG_DI, "....  CMD play audio stream");
+			// first is (offset >> 2) 
+			// second is length
+			// if both 0 means stop
+			// 1. play audio stream (sets position and size)
+			// 2. reset sample counter and start streaming (ai)
+			// 3. play audio stream with all 0???
+			// by default, it loops the track
+			//  to change that, another prepare audio stream is called
+			//  while this one is playing, to prepare next track
+			//  depth of the queue is 1 (only one track can be set after the
+			//  current one)
+			//  another way is to call DVDStopStreamAtEnd, which puts in queue
+			//  all 0 (preparing another track can't be called until the end)
+			// so correct behaviour, is to have a playing track info
+			// which is used only at the start of playback, then after it finishes
+			// its checked again, and either looped, changed track, or stopped
+			// to stop, first stop ai stream, then send 0
+			DEBUG (EVENT_LOG_DI, "....  CMD play audio stream %.8x %.8x (%.2x)",
+						 RDI32 (DI_CMDBUF1) << 2, RDI32 (DI_CMDBUF2),
+						 ((RDI32 (DI_CMDBUF0) >> 16) & 0xff));
+
+			// offset has to be shifted by 2
+			adpstream.offset = RDI32 (DI_CMDBUF1);
+			adpstream.length = RDI32 (DI_CMDBUF2);
+			adp_stream_set (&adpstream);
 			break;
 
 		// request audio status
+			// if a stream is playing, and stop is called, and then play again,
+			// it requests audio status with subcmd 0
 		case 0xe2000000:
-			DEBUG (EVENT_LOG_DI, "....  CMD request audio status");
+			DEBUG (EVENT_LOG_DI, "....  CMD request audio status (%.2x)",
+						 ((RDI32 (DI_CMDBUF0) >> 16) & 0xff));
+			// maybe 0x01 subcommand means audio position?
+			if (((RDI32 (DI_CMDBUF0) >> 16) & 0xff) == 0x01)
+				RDI32 (DI_IMMBUF) = (adp_stream_ofs () &~ 0x7fff) >> 2;
+			else
+			{
+				// playback status
+				extern int stream_playing;
+				RDI32 (DI_IMMBUF) = stream_playing;
+				// stream status (lower 8 bits)
+				// 0 - ??
+				// 
+//				DEBUG (EVENT_STOP, "..di: unknown 'di request audio status' subcommand");
+			}
 			break;
 
 		// stop motor
@@ -182,18 +246,18 @@ void di_execute_command (void)
 			DEBUG (EVENT_LOG_DI, "....  CMD stop motor");
 			break;
 		
-		// dvd audio disable
+		// dvd audio enable / disable
 		case 0xe4000000:
-			DEBUG (EVENT_LOG_DI, "....  CMD dvd audio disable");
-			break;
-		
-		// dvd audio enable
-		case 0xe4010000:
-			DEBUG (EVENT_LOG_DI, "....  CMD dvd audio enable");
+			DEBUG (EVENT_LOG_DI, "....  CMD dvd audio %s", 
+						 ((RDI32 (DI_CMDBUF0) >> 16) & 0xff) ? "enable" : "disable");
 			break;
 		
 		default:
-			DEBUG (EVENT_LOG_DI, "....  CMD unknown command (%.8x)", RDI32 (DI_CMDBUF0));
+			if (((RDI32 (DI_CMDBUF0) >> 24) == 0xfe) ||
+					((RDI32 (DI_CMDBUF0) >> 24) == 0xff))
+				DEBUG (EVENT_LOG_DI, "....  CMD debug command (%.8x)", RDI32 (DI_CMDBUF0));
+			else
+				DEBUG (EVENT_LOG_DI, "....  CMD unknown command (%.8x)", RDI32 (DI_CMDBUF0));
 			break;
 	}
 /*
@@ -213,6 +277,7 @@ void di_w32_dicr (__u32 addr, __u32 data)
 		RDI32 (addr) &= ~DICR_TSTART;
 
 		di_execute_command ();
+		cnt_di++;
 
 		// transfer complete interrupt
 		RDI32 (DI_SR) |= DISR_TCINT;
@@ -249,6 +314,12 @@ void di_close_cover (void)
 }
 
 
+void di_read_stream (void *dest, __u32 offset, __u32 size)
+{
+	mdvd_read_fixed_noseek (dest, size, offset);
+}
+
+
 // dir
 DirItem *dir_get_item (Dir *dir, int n)
 {
@@ -275,7 +346,7 @@ DirItem *dir_find_item_by_offset (Dir *dir, __u32 offset, Dir **parent)
 	p = dir->items;
 	while (p)
 	{
-		if (p->type == DIR_ITEM_DIRECTORY && (k = dir_find_item_by_offset (p->sub, offset, parent)))
+		if (p->type == DIR_ITEM_DIRECTORY && (k = dir_find_item_by_offset ((Dir *) p->sub, offset, parent)))
 				return k;
 		else if (offset >= p->offset && offset < p->offset + p->size)
 		{
@@ -301,7 +372,7 @@ DirItem *dir_get_item_by_path (Dir *dir, const char *filename)
 	if (!dir)
 		return NULL;
 
-	t = strchr (filename, '/');
+	t = strchr ((char *) filename, '/');
 	if (t)
 		len = t - filename;
 	else
@@ -309,10 +380,10 @@ DirItem *dir_get_item_by_path (Dir *dir, const char *filename)
 
 	while (p)
 	{
-		if (0 == strncmp (filename, p->name, len))
+		if (0 == strncmp (filename, (const char *) p->name, len))
 		{
 			if (p->type == DIR_ITEM_DIRECTORY)
-				return dir_get_item_by_path (p->sub, filename + len + 1);
+				return dir_get_item_by_path ((Dir *) p->sub, filename + len + 1);
 			else
 				return p;
 		}
@@ -335,7 +406,7 @@ DirItem *dir_find_item_by_offset_aligned (Dir *dir, __u32 offset, Dir **parent)
 	p = dir->items;
 	while (p)
 	{
-		if (p->type == DIR_ITEM_DIRECTORY && (k = dir_find_item_by_offset_aligned (p->sub, offset, parent)))
+		if (p->type == DIR_ITEM_DIRECTORY && (k = dir_find_item_by_offset_aligned ((Dir *) p->sub, offset, parent)))
 				return k;
 		else if (offset >= (p->offset &~ 3) && offset < (p->offset &~ 3) + p->size)
 		{
@@ -413,10 +484,10 @@ int dir_add_items (Dir *dir, __u32 *fst, char *st, int offset, int last_offset)
 
 	while (offset < last_offset)
 	{
-		item = calloc (1, sizeof (DirItem));
+		item = (DirItem *) calloc (1, sizeof (DirItem));
 
-		item->name = strdup (&st[BSWAP32 (fst[offset*3]) & 0x00ffffff]);
-		if (*item->name < 0x20 || *item->name > 0x7f)
+		item->name = (char *) strdup (&st[BSWAP32 (fst[offset*3]) & 0x00ffffff]);
+		if (*item->name < 0x20)
 		{
 			free (item->name);
 			offset++;
@@ -435,18 +506,18 @@ int dir_add_items (Dir *dir, __u32 *fst, char *st, int offset, int last_offset)
 		if (item->type == DIR_ITEM_DIRECTORY)
 		{
 			// first entry
-			DirItem *first = calloc (1, sizeof (DirItem));
+			DirItem *first = (DirItem *) calloc (1, sizeof (DirItem));
 
 			first->type = DIR_ITEM_DIRECTORY;
-			first->name = strdup ("..");
+			first->name = (char *) strdup ("..");
 			first->sub = NULL;
 			first->parent = dir;
 
 			item->parent = dir;
 			item->sub = calloc (1, sizeof (Dir));
 			
-			dir_add_item (item->sub, first);
-			dir_add_items (item->sub, fst, st, offset, item->size);
+			dir_add_item ((Dir *) item->sub, first);
+			dir_add_items ((Dir *) item->sub, fst, st, offset, item->size);
 			offset = item->size;
 		}
 	}
@@ -458,10 +529,10 @@ int dir_add_items (Dir *dir, __u32 *fst, char *st, int offset, int last_offset)
 
 DirItem *dir_item_create (char *name, int type, unsigned int offset, unsigned int size)
 {
-	DirItem *item = calloc (1, sizeof (DirItem));
+	DirItem *item = (DirItem *) calloc (1, sizeof (DirItem));
 
 
-	item->name = strdup (name);
+	item->name = (char *) strdup (name);
 	item->type = type;
 	item->offset = offset;
 	item->size = size;
@@ -489,7 +560,7 @@ Dir *dir_create (char *path, Dir *parent)
 		return 0;
 	}
 
-	dir = calloc (1, sizeof (Dir));
+	dir = (Dir *) calloc (1, sizeof (Dir));
 	dir->path = strdup (path);
 	nitems = n - 2;
 
@@ -528,13 +599,13 @@ Dir *dir_create (char *path, Dir *parent)
 												  	 DIR_ITEM_DIRECTORY, 0, 0);
 		item->size = file_size (buff);
 
-		get_extension (buff, item->name);
+		get_extension (buff, (const char *) item->name);
 		if ((0 == strcasecmp (buff, "dol")) ||
 				(0 == strcasecmp (buff, "elf")))
 			item->type = DIR_ITEM_EXECUTABLE;
 		else if ((0 == strcasecmp (buff, "gcm")) ||
 						 (0 == strcasecmp (buff, "imp")) ||
-						 (0 == strcasecmp (&item->name[strlen (item->name) - 6], "gcm.gz")))
+						 (0 == strcasecmp ((const char *) &item->name[strlen ((const char *) item->name) - 6], "gcm.gz")))
 			item->type = DIR_ITEM_GCM;
 		else
 			item->type = DIR_ITEM_FILE;
@@ -563,7 +634,7 @@ void dir_destroy (Dir *dir)
 		n = p->next;
 	
 		if (p->type == DIR_ITEM_DIRECTORY && p->sub)
-			dir_destroy (p->sub);
+			dir_destroy ((Dir *) p->sub);
 
 		free (p->name);
 		free (p);
@@ -578,9 +649,10 @@ void dir_destroy (Dir *dir)
 int is_gcm (char *filename)
 {
 	// only by extension
-	if ((0 == strcasecmp (&filename[strlen (filename) - 3], "gcm")) ||
+	if ((0 == strcasecmp (&filename[strlen (filename) - 3], "gcm"))    ||
 			(0 == strcasecmp (&filename[strlen (filename) - 6], "gcm.gz")) ||
-			(0 == strcasecmp (&filename[strlen (filename) - 3], "imp")))
+			(0 == strcasecmp (&filename[strlen (filename) - 3], "imp"))    ||
+			(0 == strcasecmp (&filename[strlen (filename) - 3], "iso")))
 		return TRUE;
 	else
 		return FALSE;
@@ -600,7 +672,7 @@ void fst_add_dir (__u32 *fst, int *fst_offset, char *st, int *st_offset, Dir *di
 	{
 		if (item->type == DIR_ITEM_DIRECTORY)
 		{
-			sub = item->sub;
+			sub = (Dir *) item->sub;
 
 			if (sub)
 			{
@@ -609,8 +681,8 @@ void fst_add_dir (__u32 *fst, int *fst_offset, char *st, int *st_offset, Dir *di
 				fst[*fst_offset*3 + 2] = BSWAP32 (item->size);
 				*fst_offset += 1;
 			
-				strcpy (&st[*st_offset], item->name);
-				*st_offset += strlen (item->name) + 1;
+				strcpy (&st[*st_offset], (const char *) item->name);
+				*st_offset += strlen ((const char *) item->name) + 1;
 
 				DEBUG (EVENT_LOG_DI, "FST OFFSET %.8x SIZE %.8x DIR  %s",
 								parent_offset, item->size, item->name);
@@ -624,8 +696,8 @@ void fst_add_dir (__u32 *fst, int *fst_offset, char *st, int *st_offset, Dir *di
 			fst[*fst_offset*3 + 2] = BSWAP32 (item->size);
 			*fst_offset += 1;
 
-			strcpy (&st[*st_offset], item->name);
-			*st_offset += strlen (item->name) + 1;
+			strcpy (&st[*st_offset], (const char *) item->name);
+			*st_offset += strlen ((const char *) item->name) + 1;
 			DEBUG (EVENT_LOG_DI, "FST OFFSET %.8x SIZE %.8x FILE %s",
 								item->offset, item->size, item->name);
 		}
@@ -638,19 +710,19 @@ void fst_add_dir (__u32 *fst, int *fst_offset, char *st, int *st_offset, Dir *di
 // calc fst_size and memory size of all items
 // set offsets of the items
 // return number of items
-int fst_setup (Dir *dir, int *fst_size, int *size, int *nitems)
+int fst_setup (Dir *dir, unsigned int *fst_size, unsigned int *size, unsigned int *nitems)
 {
 	DirItem *item = dir->items;
 
 
 	while (item)
 	{
-		*fst_size += 3*4 + strlen (item->name) + 1;
+		*fst_size += 3*4 + strlen ((const char *) item->name) + 1;
 		if (item->type == DIR_ITEM_DIRECTORY)
 		{
 			if (item->sub)
 			{
-				fst_setup (item->sub, fst_size, size, nitems);
+				fst_setup ((Dir *) item->sub, fst_size, size, nitems);
 				item->size = *nitems + 1;
 			}
 		}
@@ -692,7 +764,7 @@ __u32 *fst_from_dir (Dir *dir, unsigned int *fst_size)
 	nitems = fst_setup (dir, fst_size, &size, &nitems) + 1;
 	// root entry size
 	*fst_size += 3*4;
-	fst = calloc (1, *fst_size);
+	fst = (__u32 *) calloc (1, *fst_size);
 
 	// root
 	fst[0] = BSWAP32 (0x01000000);
@@ -735,7 +807,7 @@ int vdvd_open (char *path)
 		mdvd.pos = 0;
 
 		mdvd.root = dir;
-		mdvd.header = calloc (1, DVD_HEADER_SIZE);
+		mdvd.header = (char *) calloc (1, DVD_HEADER_SIZE);
 		mdvd.fst = (char *) fst_from_dir (dir, &fst_size);
 		mdvd.fst_size = fst_size;
 
@@ -799,7 +871,7 @@ unsigned int vdvd_read (void *dest, unsigned int size)
 		{
 			offset = mdvd.pos - p->offset;
 			sprintf (buff, "%s/%s", parent->path, p->name);
-			DEBUG (EVENT_LOG_DI, "....  vdvd | reading file %s (offset %x)", p->name, offset);
+			DEBUG (EVENT_LOG_DI, "....  vdvd | reading file %s (offset %.8x)", p->name, offset);
 
 			f = fopen (buff, "r");
 			if (!f)
@@ -827,7 +899,7 @@ void mdvd_close (void)
 
 	if (mdvd.f)
 	{
-		file_close (mdvd.f);
+		file_close ((File *) mdvd.f);
 		mdvd.f = NULL;
 		free (mdvd.filename);
 
@@ -859,14 +931,14 @@ Dir *mdvd_load_directory (char *path)
 
 	file_seek (file, DVD_FST_OFFSET, SEEK_SET);
 	file_seek (file, BSWAP32 (file_read_w (file)), SEEK_SET);
-	buff = malloc (size);
+	buff = (__u32 *) malloc (size);
 	file_read (file, buff, size);
 	file_close (file);
 
-	root = calloc (1, sizeof (Dir));
-	first = calloc (1, sizeof (DirItem));
+	root = (Dir *) calloc (1, sizeof (Dir));
+	first = (DirItem *) calloc (1, sizeof (DirItem));
 	first->type = DIR_ITEM_DIRECTORY;
-	first->name = strdup ("..");
+	first->name = (char *) strdup ("..");
 
 	dir_add_item (root, first);
 	dir_add_items (root, buff, (char *) &buff[BSWAP32 (buff[2])*3], 1, BSWAP32 (buff[2]));
@@ -901,7 +973,7 @@ unsigned int mdvd_read (void *dest, unsigned int size)
 	}
 
 	mdvd.pos += size;
-	return file_read (mdvd.f, dest, size);
+	return file_read ((File *) mdvd.f, dest, size);
 }
 
 
@@ -934,7 +1006,29 @@ unsigned int mdvd_read_fixed (void *dest, unsigned int size)
 	}
 
 	mdvd.pos += size;
-	return file_read (mdvd.f, dest, size);
+	return file_read ((File *) mdvd.f, dest, size);
+}
+
+
+unsigned int mdvd_read_fixed_noseek (void *dest, __u32 size, __u32 ofs)
+{
+	__u32 lastpos, ret;
+
+	
+	if (!mdvd.f && !mdvd.vdvd_inserted)
+	{
+		DEBUG (EVENT_EFATAL, "dvd read executed with no dvd in drive");
+		return 0;
+	}
+
+	lastpos = mdvd.pos;
+	mdvd_seek (ofs);
+//	mdvd.pos = ofs;
+	ret = mdvd_read_fixed (dest, size);
+//	mdvd.pos = lastpos;
+	mdvd_seek (lastpos);
+
+	return ret;
 }
 
 
@@ -971,18 +1065,18 @@ Dir *mdvd_read_fst (int modify_mem)
 		MEMWR32 (MEM_FST, MEMR32 (MEM_HEAP_TOP));
 		MEMWR32 (MEM_FST_SIZE, max_size);
 
-		buff = (void *) MEM_ADDRESS (MEMR32 (MEM_FST));
+		buff = (__u32 *) MEM_ADDRESS (MEMR32 (MEM_FST));
 	}
 	else
-		buff = malloc (size);
+		buff = (__u32 *) malloc (size);
 
 	mdvd_read (buff, size);
 	mdvd_seek (0);
 
-	root = calloc (1, sizeof (Dir));
-	first = calloc (1, sizeof (DirItem));
+	root = (Dir *) calloc (1, sizeof (Dir));
+	first = (DirItem *) calloc (1, sizeof (DirItem));
 	first->type = DIR_ITEM_DIRECTORY;
-	first->name = strdup ("..");
+	first->name = (char *) strdup ("..");
 	dir_add_item (root, first);
 	dir_add_items (root, buff, (char *) &buff[BSWAP32 (buff[2])*3], 1, BSWAP32 (buff[2]));
 	mdvd.root = root;
@@ -1062,7 +1156,7 @@ unsigned int mdvd_seek_whence (unsigned int offset, int whence)
 		}
 	}
 	else
-		mdvd.pos = file_seek (mdvd.f, offset, whence);
+		mdvd.pos = file_seek ((File *) mdvd.f, offset, whence);
 	
 	return mdvd.pos;
 }
@@ -1077,7 +1171,7 @@ unsigned int mdvd_seek (unsigned int offset)
 	if (mdvd.vdvd_inserted)
 		return offset;
 	else
-		return file_seek (mdvd.f, offset, SEEK_SET);
+		return file_seek ((File *) mdvd.f, offset, SEEK_SET);
 }
 
 
@@ -1182,6 +1276,7 @@ void di_reinit (void)
 void di_init (void)
 {
 	memset (rdi, 0, sizeof (rdi));
+	memset (&adpstream, 0, sizeof (adpstream));
 
 	di_open_cover ();
 

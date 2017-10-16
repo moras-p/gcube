@@ -30,20 +30,20 @@ HLE (bzero)
 
 HLE (strlen)
 {
-	HLE_RETURN (strlen (HLE_PARAM_1_PTR));
+	HLE_RETURN (strlen ((const char *) HLE_PARAM_1_PTR));
 }
 
 
 HLE (strncpy)
 {
-	strncpy (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR, HLE_PARAM_3);
+	strncpy ((char *) HLE_PARAM_1_PTR, (const char *) HLE_PARAM_2_PTR, HLE_PARAM_3);
 	HLE_RETURN (HLE_PARAM_1);
 }
 
 
 HLE (strcpy)
 {
-	strcpy (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR);
+	strcpy ((char *) HLE_PARAM_1_PTR, (const char *) HLE_PARAM_2_PTR);
 	HLE_RETURN (HLE_PARAM_1);
 }
 
@@ -52,7 +52,7 @@ HLE (strcpy)
 extern PADStatus pads[4];
 HLE (PADRead)
 {
-	PADStatus *status = HLE_PARAM_1_PTR;
+	PADStatus *status = (PADStatus *) HLE_PARAM_1_PTR;
 	int i;
 
 
@@ -90,8 +90,7 @@ const char *movie_ext[] =
 
 int is_movie_file (const char *name)
 {
-	int len = strlen (name);
-	int i;
+	unsigned int i, len = strlen (name);
 
 
 	if (len > 4)
@@ -105,7 +104,7 @@ int is_movie_file (const char *name)
 
 HLE (DVDOpen_ignore_movies)
 {
-	if (is_movie_file (HLE_PARAM_1_PTR))
+	if (is_movie_file ((const char *) HLE_PARAM_1_PTR))
 		HLE_RETURN (0);
 	
 	HLE_EXECUTE_LLE;
@@ -114,8 +113,8 @@ HLE (DVDOpen_ignore_movies)
 
 HLE (DVDConvertPathToEntrynum_ignore_movies)
 {
-	if (is_movie_file (HLE_PARAM_1_PTR))
-		HLE_RETURN (-1);
+	if (is_movie_file ((const char *) HLE_PARAM_1_PTR))
+		HLE_RETURN ((__u32) -1);
 
 	HLE_EXECUTE_LLE;
 }
@@ -132,8 +131,9 @@ HLE (THPPlayerGetState_ignore_movies)
 // not all params will be passed. won't work with fp params.
 HLE (OSReport_crippled)
 {
+// problems with 64 bit code ((void *) is 64 bit)
 	static char buff[4096];
-	unsigned char *format = HLE_PARAM_1_PTR, *p;
+	const char *format = (const char *) HLE_PARAM_1_PTR, *p;
 	int len, i = 0;
 	__u32 params[128];
 
@@ -165,6 +165,7 @@ HLE (OSReport_crippled)
 HLE (VIGetCurrentLine)
 {
 	static float current_line = 0;
+
 
 	current_line += 50;
 	if (current_line >= 575)

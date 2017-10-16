@@ -64,8 +64,22 @@ extern __u8 EFB[EFB_SIZE];
 #define EFB16(X)				(*((__u16 *) &EFB (X)))
 #define EFB32(X)				(*((__u32 *) &EFB (X)))
 
-#define MMU_OK					1
-#define MMU_ERROR				0
+//#define MMU_ENABLED			
+
+#define MMU_OK					TRUE
+#define MMU_ERROR				FALSE
+
+#ifdef MMU_ENABLED
+# define EA_MASK						0x3fffffff
+# define MEM_EFB_BASE				0x08000000
+# define MEM_HW_BASE				0x0c000000
+# define MEM_LC_BASE				0x20000000
+#else
+# define EA_MASK						0xffffffff
+# define MEM_EFB_BASE				0xc8000000
+# define MEM_HW_BASE				0xcc000000
+# define MEM_LC_BASE				0xe0000000
+#endif
 
 
 typedef union
@@ -81,6 +95,42 @@ typedef union
 	float fp;
 } Single32;
 
+static inline float U32TOSINGLE (__u32 a)
+{
+	Single32 d;
+	d.bin = a;
+	return d.fp;
+}
+
+static inline __u32 SINGLETOU32 (float a)
+{
+	Single32 d;
+	d.fp = a;
+	return d.bin;
+}
+
+static inline double U64TODOUBLE (__u64 a)
+{
+	Double64 d;
+	d.bin = a;
+	return d.fp;
+}
+
+static inline __u64 DOUBLETOU64 (double a)
+{
+	Double64 d;
+	d.fp = a;
+	return d.bin;
+}
+
+static inline __u64 U32TODOUBLE64 (__u32 a)
+{
+	Double64 d;
+	d.fp = U32TOSINGLE (a);
+	return d.bin;
+}
+
+
 
 #define MEMS(A)				((__s8) MEM (A))
 
@@ -93,7 +143,7 @@ typedef union
 #define MEMS64(A)			(*((__s64 *) &MEM (A)))
 
 #define MEMF(A)				(*((float *) &MEM (A)))
-#define MEMRF(A)			(((Single32) MEMR32 (A)).fp)
+#define MEMRF(A)			(U32TOSINGLE (MEMR32 (A)))
 
 #define MEMR16(A)			(BSWAP16 (MEM16 (A)))
 #define MEMR32(A)			(BSWAP32 (MEM32 (A)))
@@ -127,10 +177,7 @@ typedef union
 # endif
 
 # ifndef BSWAPF
-#  define BSWAPF(B)\
-	({\
-			((Single32) BSWAP32 (((Single32) (B)).bin)).fp;\
-	})
+#  define BSWAPF(B)		U32TOSINGLE (BSWAP32 (SINGLETOU32 (B)))
 # endif
 
 # define BIG_BSWAP16(B)	(B)
@@ -159,31 +206,24 @@ typedef union
 #define MEM_COPY_TO_PTR			mem_copy_to_ptr
 #define MEM_COPY_FROM_PTR		mem_copy_from_ptr
 
-#define SINGLE_TO_DOUBLE(X)		(((Double64) ((double) ((Single32) X).fp)).bin)
-
 // reads
-#define MEM_RBYTE				read_byte
-#define MEM_RHALF				read_half_word
-#define MEM_RHALF_S			(__s16) read_half_word
-#define MEM_RHALF_SR		(__s16) read_half_word_r
-#define MEM_RWORD				read_word
-#define MEM_RWORD_R			read_word_r
+#define MEM_RBYTE(D,A)				(read_byte ((__u8 *) D, (A)))
+#define MEM_RHALF(D,A)				(read_half_word ((__u16 *) D, (A)))
+#define MEM_RHALF_S(D,A)			(read_half_word ((__u16 *) D, (A)))
+#define MEM_RHALF_SR(D,A	)		(read_half_word_r ((__u16 *) D, (A)))
+#define MEM_RWORD(D,A)				(read_word ((__u32 *) D, (A)))
+#define MEM_RWORD_R(D,A)			(read_word_r ((__u32 *) D, (A)))
+#define MEM_RSINGLE(D,A)			(read_single ((__u64 *) D, (A)))
+#define MEM_RDOUBLE(D,A)			(read_double ((__u64 *) D, (A)))
 
 // writes
-#define MEM_WBYTE				write_byte
-#define MEM_WHALF				write_half_word
-#define MEM_WHALF_R			write_half_word_r
-#define MEM_WWORD				write_word
-#define MEM_WWORD_R			write_word_r
-
-#define MEM_WSINGLE(A,d)			(write_word (A, ((Single32) (d)).bin))
-#define MEM_RSINGLE_F(A)			(((Single32) read_word (A)).fp)
-#define MEM_RSINGLE_B(A)			(((Single32) read_word (A)).bin)
-
-#define MEM_WDOUBLE(A,d)			(write_double (A, ((Double64) (d)).bin))
-#define MEM_RDOUBLE_F(A)			(((Double64) read_double (A)).fp)
-#define MEM_RDOUBLE_B(A)			(((Double64) read_double (A)).bin)
-
+#define MEM_WBYTE(A,D)				(write_byte (A, (__u8) D))
+#define MEM_WHALF(A,D)				(write_half_word (A, (__u16) D))
+#define MEM_WHALF_R(A,D)			(write_half_word_r (A, (__u16) D))
+#define MEM_WWORD(A,D)				(write_word (A, (__u32) D))
+#define MEM_WWORD_R(A,D)			(write_word_r (A, (__u32) D))
+#define MEM_WSINGLE(A,D)			(write_word (A, SINGLETOU32 (D)))
+#define MEM_WDOUBLE(A,D)			(write_double (A, DOUBLETOU64 (D)))
 
 // memory map
 #define MEM_BOOT_MAGIC					0x80000020
@@ -218,12 +258,13 @@ typedef union
 
 void mem_reset (void);
 
-__u8 read_byte (__u32 addr);
-__u16 read_half_word_r (__u32 addr);
-__u16 read_half_word (__u32 addr);
-__u32 read_word_r (__u32 addr);
-__u32 read_word (__u32 addr);
-__u64 read_double (__u32 addr);
+int read_byte (__u8 *data, __u32 addr);
+int read_half_word_r (__u16 *data, __u32 addr);
+int read_half_word (__u16 *data, __u32 addr);
+int read_word_r (__u32 *data, __u32 addr);
+int read_word (__u32 *data, __u32 addr);
+int read_single (__u64 *data, __u32 addr);
+int read_double (__u64 *data, __u32 addr);
 int write_byte (__u32 addr, __u8 data);
 int write_half_word_r (__u32 addr, __u16 data);
 int write_half_word (__u32 addr, __u16 data);
@@ -231,20 +272,36 @@ int write_word_r (__u32 addr, __u32 data);
 int write_word (__u32 addr, __u32 data);
 int write_double (__u32 addr, __u64 data);
 
-inline __u8 mem_read8_safe (__u32 addr);
-inline __u32 mem_read32_safe (__u32 addr);
+__u8 mem_read8_safe (__u32 addr);
+__u32 mem_read32_safe (__u32 addr);
 
 void mem_fake_w32 (__u32 addr, __u32 data);
 __u32 mem_fake_r32 (__u32 addr);
 void mem_fake_w16 (__u32 addr, __u16 data);
 __u16 mem_fake_r16 (__u32 addr);
 
-void mem_hwr_hook (int bits, __u32 addr, void *ptr);
-void mem_hww_hook (int bits, __u32 addr, void *ptr);
+void mem_hwr_hookx (int bits, __u32 addr, void *ptr);
+void mem_hww_hookx (int bits, __u32 addr, void *ptr);
+#define mem_hwr_hook(b,a,p) (mem_hwr_hookx (b, a, (void *) p))
+#define mem_hww_hook(b,a,p) (mem_hww_hookx (b, a, (void *) p))
 
-void mem_set (__u32 addr, __u8 fill, __u32 size);
-void mem_copy_to_ptr (__u8 *dst, __u32 address, __u32 size);
-void mem_copy_from_ptr (__u32 address, __u8 *src, __u32 size);
+int mem_set (__u32 addr, __u8 fill, __u32 size);
+int mem_copy_to_ptr (__u8 *dst, __u32 address, __u32 size);
+int mem_copy_from_ptr (__u32 address, __u8 *src, __u32 size);
 int mem_dump (const char *filename, __u32 address, __u32 length);
+
+int mem_fetch (__u32 pc, __u32 *op);
+int mem_block_zero (__u32 addr);
+
+#ifdef MMU_ENABLED
+int mmu_effective_to_physical (__u32 *pa, __u32 ea, int write, int code);
+int mmu_effective_to_physical_debug (__u32 *pa, __u32 ea, int code);
+#else
+# define mmu_effective_to_physical(pa,ea,w,c)	(*pa = ea & EA_MASK)
+# define mmu_effective_to_physical_debug(pa,ea,c)	(*pa = ea & EA_MASK)
+#endif
+
+void mmu_print_setup (void);
+
 
 #endif // __MEM_H

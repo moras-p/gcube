@@ -127,9 +127,9 @@ void pad_action (int n, int pressed, int action)
 		{
 		// use only half of the max range of analog
 			if (action & 2)
-				pad_action_axis (n, action / 2, (action & 1) ? 127/1 : -128/1);
+				pad_action_axis (n, action / 2, (action & 1) ? 127/1 : -127/1);
 			else
-				pad_action_axis (n, action / 2, (action & 1) ? -128/1 : 127/1);
+				pad_action_axis (n, action / 2, (action & 1) ? -127/1 : 127/1);
 		}
 		else
 			pad_action_axis (n, action / 2, 0);

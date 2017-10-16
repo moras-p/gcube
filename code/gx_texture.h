@@ -23,7 +23,7 @@ typedef struct
 	unsigned int p2;
 	int reload;
 	
-	int width, height;
+	__u32 width, height;
 	int format;
 	int tlut_format;
 	
@@ -76,7 +76,7 @@ void gx_convert_texture_ci8_rgba (__u8 *src, int width, int height, __u16 *tlut,
 void gx_convert_texture_ci14x2_rgba (__u8 *data, int width, int height, __u16 *tlut, int format, TexFormat *tf);
 void gx_convert_texture_cmp_rgba (__u8 *data, int width, int height, __u16 *tlut, int format, TexFormat *tf);
 void gx_convert_texture_i4_rgba (__u8 *src, int width, int height, __u16 *tlut, int format, TexFormat *tf);
-char *gx_convert_texture (__u8 *src, int width, int height, int format, __s16 *tlut, int tlut_format);
+__u8 *gx_convert_texture (__u8 *src, int width, int height, int format, __u16 *tlut, int tlut_format);
 
 __u32 gl_texture_calculate_size (__u32 npixels, unsigned int gl_internal_format);
 __u32 gx_texture_calculate_size (__u32 width, __u32 height, unsigned int format);
@@ -95,7 +95,7 @@ TextureTag *texcache_add_tag (__u32 address, __u32 tlut_address,
 		unsigned int tex, unsigned int type, int width, int height,
 		int format, int tlut_format, unsigned int gl_internal_format,
 		int mipmap, int min_lod, int max_lod,	__u32 even_lod);
-TextureTag *texcache_fetch (__u32 address, __u32 tlut_address, int width, int height);
+TextureTag *texcache_fetch (__u32 address, __u32 tlut_address, __u32 width, __u32 height);
 
 void gx_enable_texture (unsigned int index, int enable);
 void gx_load_texture (unsigned int index);
@@ -103,7 +103,7 @@ void gx_dump_active_texture (int index, int lod);
 void gx_render_to_texture (__u32 address, unsigned int x, unsigned int y,
 													 unsigned int w, unsigned int h, int mipmap, int type);
 
-inline int gx_is_tex_p2 (int n);
+int gx_is_tex_p2 (int n);
 
 
 #endif // __GX_TEXTURE_H

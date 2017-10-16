@@ -167,7 +167,7 @@ __u32 load_gc (char *filename);
 int is_imp (char *fname);
 void imp_close (IMPFile *file);
 IMPFile *imp_open (char *fname);
-int imp_seek (IMPFile *file, int offset, int whence);
+int imp_seek (IMPFile *file, unsigned int offset, int whence);
 int imp_read (IMPFile *file, char *buff, unsigned int size);
 
 File *file_open (char *filename);

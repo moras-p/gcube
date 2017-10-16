@@ -36,6 +36,7 @@ OBJECTS=\
 	 timer_sdl.o\
 	 dsp_opcodes.o\
 	 cg.o\
+	 gx_cunpacks.o\
 	 dsp_disassemble.o
 	 
 OBJECTS+=\
@@ -160,8 +161,7 @@ $(ODIR)/res.o: $(CDIR)/res.rc
 $(ODIR)/jpeg_tools.o: $(EXTERNAL_DIR)/$(JPEG_DIR)/jconfig.h
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) -c $(CDIR)/jpeg_tools.c -o $@
 
-#$(ODIR)/cg.o: $(CDIR)/cg_fragment.c $(CDIR)/cg.c
-$(ODIR)/cg.o: $(CDIR)/cg.c
+$(ODIR)/cg.o: $(CDIR)/cg_fragment.c $(CDIR)/cg.c
 	$(CC) $(CFLAGS) -c $(CDIR)/cg.c -o $@
 
 $(ODIR)/scandir.o:	$(SCANDIR_DIR)/scandir.c
@@ -221,4 +221,7 @@ clean-other:
 clean: clean-runnable clean-jpeg clean-other
 
 distclean: clean-runnable distclean-jpeg clean-other
-	$(DRM) maps screenshots videos memcard_a.gmc memcard_b.gmc gcuberc
+	$(DRM) Debug maps screenshots videos memcard_a.gmc memcard_b.gmc gcuberc
+
+$(CDIR)/cg_fragment.c: $(CDIR)/cg_fragment.cg
+	xxd -i $(CDIR)/cg_fragment.cg > $(CDIR)/cg_fragment.c

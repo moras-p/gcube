@@ -21,12 +21,17 @@
 
 void hw_init (void);
 void hw_reinit (void);
+void hw_check_interrupts ();
 void hw_set_video_mode (int country_code);
 
 int hw_rword (__u32 address, __u32 *data);
 int hw_rhalf (__u32 address, __u16 *data);
 int hw_wword (__u32 address, __u32 data);
 int hw_whalf (__u32 address, __u16 data);
+
+extern int ref_delay;
+void hw_update (void);
+void hw_force_vi_refresh (void);
 
 
 #endif // __HW_H

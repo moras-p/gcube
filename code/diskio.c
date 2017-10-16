@@ -25,6 +25,7 @@
 #include "diskio.h"
 #include "mem.h"
 
+
  // gzseek is buggy on windows, need to call gzrewind first
 z_off_t my_gzseek(gzFile file, z_off_t offset, int whence)
 {
@@ -38,7 +39,8 @@ z_off_t my_gzseek(gzFile file, z_off_t offset, int whence)
 #define gzseek my_gzseek
 #endif
 
-int gzseekend (gzFile *file)
+
+int gzseekend (void *file)
 {
 	char buff[0x1000];
 	int len = 0, t = 0x1000;
@@ -106,12 +108,12 @@ IMPFile *imp_open (char *fname)
 	if (!is_imp (fname))
 		return NULL;
 
-	file = calloc (1, sizeof (IMPFile));
+	file = (IMPFile *) calloc (1, sizeof (IMPFile));
 	file->f = fopen (fname, "rb");
 	fread (&gcph, 1, sizeof (IMPHeader), file->f);
 
 	// read items
-	ml = m = file->current_mark = file->marks = calloc (1, sizeof (IMPMark));
+	ml = m = file->current_mark = file->marks = (IMPMark *) calloc (1, sizeof (IMPMark));
 	for (i = 0; i < BSWAP32 (gcph.nitems); i++)
 	{
 		ml = m;
@@ -122,7 +124,7 @@ IMPFile *imp_open (char *fname)
 		fread (&d, 1, 4, file->f);
 		m->length = BSWAP32 (d);
 
-		m->next = calloc (1, sizeof (IMPMark));
+		m->next = (IMPMark *) calloc (1, sizeof (IMPMark));
 		m = m->next;
 	}
 
@@ -136,7 +138,7 @@ IMPFile *imp_open (char *fname)
 }
 
 
-int imp_seek (IMPFile *file, int offset, int whence)
+int imp_seek (IMPFile *file, unsigned int offset, int whence)
 {
 	IMPMark *m = file->marks;
 	unsigned int voffset;
@@ -225,7 +227,6 @@ int imp_read (IMPFile *file, char *buff, unsigned int size)
 	return bcount;
 }
 
-
 // read-only binary files
 File *file_open (char *filename)
 {
@@ -236,12 +237,12 @@ File *file_open (char *filename)
 		return NULL;
 
 
-	file = calloc (1, sizeof (File));
+	file = (File *) calloc (1, sizeof (File));
 	file->filename = strdup (filename);
 
-	if (is_imp (filename))
+	if (is_imp(filename))
 	{
-		file->f = imp_open (filename);
+		file->f = imp_open(filename);
 		file->type = FILE_IMP;
 	}
 	else
@@ -254,7 +255,7 @@ File *file_open (char *filename)
 void file_close (File *file)
 {
 	if (file->type == FILE_IMP)
-		imp_close (file->f);
+		imp_close ((IMPFile *) file->f);
 	else
 		gzclose (file->f);
 
@@ -266,11 +267,11 @@ void file_close (File *file)
 int file_seek (File *file, int offset, int whence)
 {
 	if (file->type == FILE_IMP)
-		return imp_seek (file->f, offset, whence);
+		return imp_seek ((IMPFile *) file->f, offset, whence);
 	else
 	{
 		if (whence == SEEK_END)
-			return gzseekend (file->f);
+			return gzseekend ((gzFile *) file->f);
 		else
 			return gzseek (file->f, offset, whence);
 	}
@@ -280,18 +281,18 @@ int file_seek (File *file, int offset, int whence)
 int file_tell (File *file)
 {
 	if (file->type == FILE_IMP)
-		return imp_tell (file->f);
+		return imp_tell ((IMPFile *) file->f);
 	else
 		return gztell (file->f);
 }
 
 
-int file_read (File *file, void *buff, unsigned int size)
+int file_read(File *file, void *buff, unsigned int size)
 {
 	if (file->type == FILE_IMP)
-		return imp_read (file->f, buff, size);
+		return imp_read((IMPFile *)file->f, (char *)buff, size);
 	else
-		return gzread (file->f, buff, size);
+		return gzread(file->f, buff, size);
 }
 
 
@@ -501,27 +502,27 @@ int is_gcs (char *filename)
 
 void gcswrite (void *f, void *buff, unsigned int size, int compressed, int reverse)
 {
-	char *temp, *p = buff;
-	int i;
+	char *temp, *p = (char *) buff;
+	unsigned int i;
 
 
 #ifdef LIL_ENDIAN
 	if (reverse)
 	{
-		temp = malloc (size);
+		temp = (char *) malloc (size);
 		for (i = 0; i < size; i++)
 			temp[i] = p[size - i - 1];
 	}
 	else
-		temp = buff;
+		temp = p;
 #else
-	temp = buff;
+	temp = p;
 #endif
 
 	if (compressed)
 		gzwrite (f, temp, size);
 	else
-		fwrite (temp, 1, size, f);
+		fwrite (temp, 1, size, (FILE *) f);
 
 	if (reverse)
 		free (temp);
@@ -530,14 +531,14 @@ void gcswrite (void *f, void *buff, unsigned int size, int compressed, int rever
 
 void gcsread (void *f, void *buff, unsigned int size, int reverse)
 {
-	char *temp, *p = buff;
-	int i;
+	char *temp, *p = (char *) buff;
+	unsigned int i;
 
 
 #ifdef LIL_ENDIAN
 	if (reverse)
 	{
-		temp = malloc (size);
+		temp = (char *) malloc (size);
 
 		gzread (f, temp, size);
 		for (i = 0; i < size; i++)

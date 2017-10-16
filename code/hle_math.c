@@ -341,49 +341,49 @@ inline void VECAdd (float *a, float *b, float *a_b)
 
 HLE (PSVECDotProduct)
 {
-	HLE_RETURN_F (VECDotProduct (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR));
+	HLE_RETURN_F (VECDotProduct (HLE_PARAM_1_PTR_F, HLE_PARAM_2_PTR_F));
 }
 
 
 HLE (PSVECCrossProduct)
 {
-	VECCrossProduct (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR, HLE_PARAM_3_PTR);
+	VECCrossProduct (HLE_PARAM_1_PTR_F, HLE_PARAM_2_PTR_F, HLE_PARAM_3_PTR_F);
 }
 
 
 HLE (PSVECScale)
 {
-	VECScale (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR, HLE_PARAM_F1);
+	VECScale (HLE_PARAM_1_PTR_F, HLE_PARAM_2_PTR_F, HLE_PARAM_F1);
 }
 
 
 HLE (PSVECSquareMag)
 {
-	HLE_RETURN_F (VECSquareMag (HLE_PARAM_1_PTR));
+	HLE_RETURN_F (VECSquareMag (HLE_PARAM_1_PTR_F));
 }
 
 
 HLE (PSVECMag)
 {
-	HLE_RETURN_F (VECMag (HLE_PARAM_1_PTR));
+	HLE_RETURN_F (VECMag (HLE_PARAM_1_PTR_F));
 }
 
 
 HLE (PSVECNormalize)
 {
-	VECNormalize (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR);
+	VECNormalize (HLE_PARAM_1_PTR_F, HLE_PARAM_2_PTR_F);
 }
 
 
 HLE (PSVECSubtract)
 {
-	VECSubtract (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR, HLE_PARAM_3_PTR);
+	VECSubtract (HLE_PARAM_1_PTR_F, HLE_PARAM_2_PTR_F, HLE_PARAM_3_PTR_F);
 }
 
 
 HLE (PSVECAdd)
 {
-	VECAdd (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR, HLE_PARAM_3_PTR);
+	VECAdd (HLE_PARAM_1_PTR_F, HLE_PARAM_2_PTR_F, HLE_PARAM_3_PTR_F);
 }
 
 
@@ -391,7 +391,7 @@ HLE (PSVECAdd)
 
 HLE (PSMTXIdentity)
 {
-	float *m = HLE_PARAM_1_PTR;
+	float *m = HLE_PARAM_1_PTR_F;
 
 	
 	m[ 0] = RF_1;
@@ -414,18 +414,19 @@ HLE (PSMTXIdentity)
 HLE (PSMTXCopy)
 {
 	if (HLE_PARAM_1 != HLE_PARAM_2)
-		MTXCopy (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR);
+		MTXCopy (HLE_PARAM_1_PTR_F, HLE_PARAM_2_PTR_F);
 }
 
 
 HLE (PSMTXConcat)
 {
-	float *a = HLE_PARAM_1_PTR, *b = HLE_PARAM_2_PTR;
-	float *m, *ab = HLE_PARAM_3_PTR;
+	float *a = HLE_PARAM_1_PTR_F, *b = HLE_PARAM_2_PTR_F;
+	float *m, *ab = HLE_PARAM_3_PTR_F;
 	float t[12];
 
 #ifdef LIL_ENDIAN
-	float ta[12] = MRF (a), tb[12] = MRF (b);
+	float ta[12] = MRF (a);
+	float tb[12] = MRF (b);
 	a = ta;
 	b = tb;
 #endif
@@ -456,7 +457,7 @@ HLE (PSMTXConcat)
 HLE (PSMTXTranspose)
 {
 	float *m;
-	float *src = HLE_PARAM_1_PTR, *dst = HLE_PARAM_2_PTR;
+	float *src = HLE_PARAM_1_PTR_F, *dst = HLE_PARAM_2_PTR_F;
 	float t[12];
 
 
@@ -485,7 +486,7 @@ HLE (PSMTXTranspose)
 HLE (PSMTXInverse)
 {
 	float *m;
-	float *src = HLE_PARAM_1_PTR, *dst = HLE_PARAM_2_PTR;
+	float *src = HLE_PARAM_1_PTR_F, *dst = HLE_PARAM_2_PTR_F;
 	float t[12], det;
 
 
@@ -540,7 +541,7 @@ HLE (PSMTXInverse)
 HLE (PSMTXInvXpose)
 {
 	float *m;
-	float *src = HLE_PARAM_1_PTR, *dst = HLE_PARAM_2_PTR;
+	float *src = HLE_PARAM_1_PTR_F, *dst = HLE_PARAM_2_PTR_F;
 	float t[12], det;
 
 
@@ -576,20 +577,20 @@ HLE (PSMTXInvXpose)
 
 HLE (PSMTXRotRad)
 {
-	MTXRotTrig (HLE_PARAM_1_PTR, HLE_PARAM_2,
+	MTXRotTrig (HLE_PARAM_1_PTR_F, HLE_PARAM_2,
 							sin (HLE_PARAM_F1), cos (HLE_PARAM_F1));
 }
 
 
 HLE (PSMTXRotTrig)
 {
-	MTXRotTrig (HLE_PARAM_1_PTR, HLE_PARAM_2, HLE_PARAM_F1, HLE_PARAM_F2);
+	MTXRotTrig (HLE_PARAM_1_PTR_F, HLE_PARAM_2, HLE_PARAM_F1, HLE_PARAM_F2);
 }
 
 
 HLE (PSMTXRotAxisRad)
 {
-	float *m = HLE_PARAM_1_PTR, *v = HLE_PARAM_2_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *v = HLE_PARAM_2_PTR_F;
 	float nv[3], s, c, t;
 
 
@@ -618,7 +619,7 @@ HLE (PSMTXRotAxisRad)
 
 HLE (PSMTXTrans)
 {
-	float *m = HLE_PARAM_1_PTR;
+	float *m = HLE_PARAM_1_PTR_F;
 
 
 	m[ 0] = RF_1;
@@ -640,7 +641,7 @@ HLE (PSMTXTrans)
 
 HLE (PSMTXTransApply)
 {
-	float *src = HLE_PARAM_1_PTR, *dst = HLE_PARAM_2_PTR;
+	float *src = HLE_PARAM_1_PTR_F, *dst = HLE_PARAM_2_PTR_F;
 
 
 	if (src != dst)
@@ -666,7 +667,7 @@ HLE (PSMTXTransApply)
 
 HLE (PSMTXScale)
 {
-	float *m = HLE_PARAM_1_PTR;
+	float *m = HLE_PARAM_1_PTR_F;
 
 
 	m[ 0] = RF_HLE_PARAM_F1;
@@ -688,7 +689,7 @@ HLE (PSMTXScale)
 
 HLE (PSMTXScaleApply)
 {
-	float *src = HLE_PARAM_1_PTR, *dst = HLE_PARAM_2_PTR;
+	float *src = HLE_PARAM_1_PTR_F, *dst = HLE_PARAM_2_PTR_F;
 
 
 	dst[ 0] = RF (RF (src[ 0]) * HLE_PARAM_F1);
@@ -710,7 +711,7 @@ HLE (PSMTXScaleApply)
 
 HLE (PSMTXQuat)
 {
-	float *m = HLE_PARAM_1_PTR, *q = HLE_PARAM_2_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *q = HLE_PARAM_2_PTR_F;
 	float s, xs, ys, zs, wx, wy, wz, xx, xy, xz, yy, yz, zz;
 
 
@@ -753,7 +754,7 @@ HLE (PSMTXQuat)
 
 HLE (PSMTXReflect)
 {
-	float *m = HLE_PARAM_1_PTR, *p = HLE_PARAM_2_PTR, *n = HLE_PARAM_3_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *p = HLE_PARAM_2_PTR_F, *n = HLE_PARAM_3_PTR_F;
 	float vxy, vxz, vyz, pdotn;
 
 #ifdef LIL_ENDIAN
@@ -786,12 +787,14 @@ HLE (PSMTXReflect)
 
 HLE (PSMTXLookAt)
 {
-	float *m = HLE_PARAM_1_PTR;
-	float *cam = HLE_PARAM_2_PTR, *camup = HLE_PARAM_3_PTR, *dest = HLE_PARAM_4_PTR;
+	float *m = HLE_PARAM_1_PTR_F;
+	float *cam = HLE_PARAM_2_PTR_F, *camup = HLE_PARAM_3_PTR_F, *dest = HLE_PARAM_4_PTR_F;
 	float look[3], right[3], up[3];
 
 #ifdef LIL_ENDIAN
-	float tcam[3] = VRF (cam), tcamup[3] = VRF (camup), tdest[3] = VRF (dest);
+	float tcam[3] = VRF (cam);
+	float tcamup[3] = VRF (camup);
+	float tdest[3] = VRF (dest);
 	cam = tcam;
 	camup = tcamup;
 	dest = tdest;
@@ -826,7 +829,7 @@ HLE (PSMTXLookAt)
 
 HLE (PSMTXLightFrustum)
 {
-	float *m = HLE_PARAM_1_PTR, t;
+	float *m = HLE_PARAM_1_PTR_F, t;
 
 
 	t = 1.0f / (HLE_PARAM_F4 - HLE_PARAM_F3);
@@ -850,7 +853,7 @@ HLE (PSMTXLightFrustum)
 
 HLE (PSMTXLightPerspective)
 {
-	float *m = HLE_PARAM_1_PTR, t;
+	float *m = HLE_PARAM_1_PTR_F, t;
 
 
 	t = 1.0f / tan (MTXDegToRad (HLE_PARAM_F1 / 2));
@@ -874,7 +877,7 @@ HLE (PSMTXLightPerspective)
 
 HLE (PSMTXLightOrtho)
 {
-	float *m = HLE_PARAM_1_PTR, t;
+	float *m = HLE_PARAM_1_PTR_F, t;
 
 
 	t = 1.0f / (HLE_PARAM_F4 - HLE_PARAM_F3);
@@ -898,7 +901,7 @@ HLE (PSMTXLightOrtho)
 
 HLE (PSMTXMultVec)
 {
-	float *m = HLE_PARAM_1_PTR, *src = HLE_PARAM_2_PTR, *dst = HLE_PARAM_3_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *src = HLE_PARAM_2_PTR_F, *dst = HLE_PARAM_3_PTR_F;
 	float *d, t[3];
 
 #ifdef LIL_ENDIAN
@@ -919,7 +922,7 @@ HLE (PSMTXMultVec)
 
 HLE (PSMTXMultVecArray)
 {
-	float *m = HLE_PARAM_1_PTR, *src = HLE_PARAM_2_PTR, *dst = HLE_PARAM_3_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *src = HLE_PARAM_2_PTR_F, *dst = HLE_PARAM_3_PTR_F;
 	__u32 i = HLE_PARAM_4;
 	float *d, *s, t[3];
 
@@ -957,7 +960,7 @@ HLE (PSMTXMultVecArray)
 
 HLE (PSMTXMultVecSR)
 {
-	float *m = HLE_PARAM_1_PTR, *src = HLE_PARAM_2_PTR, *dst = HLE_PARAM_3_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *src = HLE_PARAM_2_PTR_F, *dst = HLE_PARAM_3_PTR_F;
 	float *d, t[3];
 
 #ifdef LIL_ENDIAN
@@ -978,7 +981,7 @@ HLE (PSMTXMultVecSR)
 
 HLE (PSMTXMultVecArraySR)
 {
-	float *m = HLE_PARAM_1_PTR, *src = HLE_PARAM_2_PTR, *dst = HLE_PARAM_3_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *src = HLE_PARAM_2_PTR_F, *dst = HLE_PARAM_3_PTR_F;
 	__u32 i = HLE_PARAM_4;
 	float *d, *s, t[3];
 
@@ -1015,7 +1018,7 @@ HLE (PSMTXMultVecArraySR)
 
 HLE (PSMTX44MultVec)
 {
-	float *m = HLE_PARAM_1_PTR, *src = HLE_PARAM_2_PTR, *dst = HLE_PARAM_3_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *src = HLE_PARAM_2_PTR_F, *dst = HLE_PARAM_3_PTR_F;
 	float *d, t[3], w;
 
 #ifdef LIL_ENDIAN
@@ -1037,7 +1040,7 @@ HLE (PSMTX44MultVec)
 
 HLE (PSMTX44MultVecArray)
 {
-	float *m = HLE_PARAM_1_PTR, *src = HLE_PARAM_2_PTR, *dst = HLE_PARAM_3_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *src = HLE_PARAM_2_PTR_F, *dst = HLE_PARAM_3_PTR_F;
 	__u32 i = HLE_PARAM_4;
 	float *d, t[3], w;
 
@@ -1075,7 +1078,7 @@ HLE (PSMTX44MultVecArray)
 
 HLE (PSMTXFrustum)
 {
-	float *m = HLE_PARAM_1_PTR, t;
+	float *m = HLE_PARAM_1_PTR_F, t;
 
 
 	t = 1.0f / (HLE_PARAM_F4 - HLE_PARAM_F3);
@@ -1105,7 +1108,7 @@ HLE (PSMTXFrustum)
 
 HLE (PSMTXPerspective)
 {
-	float *m = HLE_PARAM_1_PTR, t;
+	float *m = HLE_PARAM_1_PTR_F, t;
 
 
 	t = 1.0f / tan (MTXDegToRad (HLE_PARAM_F1 / 2));
@@ -1134,7 +1137,7 @@ HLE (PSMTXPerspective)
 
 HLE (PSMTXOrtho)
 {
-	float *m = HLE_PARAM_1_PTR, t;
+	float *m = HLE_PARAM_1_PTR_F, t;
 
 
 	t = 1.0f / (HLE_PARAM_F4 - HLE_PARAM_F3);
@@ -1164,7 +1167,7 @@ HLE (PSMTXOrtho)
 
 HLE (PSMTX44Identity)
 {
-	float *m = HLE_PARAM_1_PTR;
+	float *m = HLE_PARAM_1_PTR_F;
 
 	
 	m[ 0] = RF_1;
@@ -1192,18 +1195,19 @@ HLE (PSMTX44Identity)
 HLE (PSMTX44Copy)
 {
 	if (HLE_PARAM_1 != HLE_PARAM_2)
-		MTX44Copy (HLE_PARAM_1_PTR, HLE_PARAM_2_PTR);
+		MTX44Copy (HLE_PARAM_1_PTR_F, HLE_PARAM_2_PTR_F);
 }
 
 
 HLE (PSMTX44Concat)
 {
-	float *a = HLE_PARAM_1_PTR, *b = HLE_PARAM_2_PTR;
-	float *m, *ab = HLE_PARAM_3_PTR;
+	float *a = HLE_PARAM_1_PTR_F, *b = HLE_PARAM_2_PTR_F;
+	float *m, *ab = HLE_PARAM_3_PTR_F;
 	float t[16];
 
 #ifdef LIL_ENDIAN
-	float ta[16] = M44RF (a), tb[16] = M44RF (b);
+	float ta[16] = M44RF (a);
+	float tb[16] = M44RF (b);
 	a = ta;
 	b = tb;
 #endif
@@ -1239,7 +1243,7 @@ HLE (PSMTX44Concat)
 HLE (PSMTX44Transpose)
 {
 	float *m;
-	float *src = HLE_PARAM_1_PTR, *dst = HLE_PARAM_2_PTR;
+	float *src = HLE_PARAM_1_PTR_F, *dst = HLE_PARAM_2_PTR_F;
 	float t[16];
 
 
@@ -1275,20 +1279,20 @@ HLE (PSMTX44Transpose)
 
 HLE (PSMTX44RotRad)
 {
-	MTX44RotTrig (HLE_PARAM_1_PTR, HLE_PARAM_2,
+	MTX44RotTrig (HLE_PARAM_1_PTR_F, HLE_PARAM_2,
 							sin (HLE_PARAM_F1), cos (HLE_PARAM_F1));
 }
 
 
 HLE (PSMTX44RotTrig)
 {
-	MTX44RotTrig (HLE_PARAM_1_PTR, HLE_PARAM_2, HLE_PARAM_F1, HLE_PARAM_F2);
+	MTX44RotTrig (HLE_PARAM_1_PTR_F, HLE_PARAM_2, HLE_PARAM_F1, HLE_PARAM_F2);
 }
 
 
 HLE (PSMTX44RotAxisRad)
 {
-	float *m = HLE_PARAM_1_PTR, *v = HLE_PARAM_2_PTR;
+	float *m = HLE_PARAM_1_PTR_F, *v = HLE_PARAM_2_PTR_F;
 	float nv[3], s, c, t;
 
 
@@ -1322,7 +1326,7 @@ HLE (PSMTX44RotAxisRad)
 
 HLE (PSMTX44Trans)
 {
-	float *m = HLE_PARAM_1_PTR;
+	float *m = HLE_PARAM_1_PTR_F;
 
 
 	m[ 0] = RF_1;
@@ -1349,7 +1353,7 @@ HLE (PSMTX44Trans)
 
 HLE (PSMTX44TransApply)
 {
-	float *src = HLE_PARAM_1_PTR, *dst = HLE_PARAM_2_PTR;
+	float *src = HLE_PARAM_1_PTR_F, *dst = HLE_PARAM_2_PTR_F;
 
 
 	if (src != dst)
@@ -1380,7 +1384,7 @@ HLE (PSMTX44TransApply)
 
 HLE (PSMTX44Scale)
 {
-	float *m = HLE_PARAM_1_PTR;
+	float *m = HLE_PARAM_1_PTR_F;
 
 
 	m[ 0] = RF_HLE_PARAM_F1;
@@ -1407,7 +1411,7 @@ HLE (PSMTX44Scale)
 
 HLE (PSMTX44ScaleApply)
 {
-	float *src = HLE_PARAM_1_PTR, *dst = HLE_PARAM_2_PTR;
+	float *src = HLE_PARAM_1_PTR_F, *dst = HLE_PARAM_2_PTR_F;
 
 
 	dst[ 0] = RF (RF (src[ 0]) * HLE_PARAM_F1);

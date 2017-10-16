@@ -76,6 +76,7 @@ HLEFunction hle_functions[] =
 	HLE_FUNCTION_EQ (BS2Report, OSReport_crippled),
 	HLE_FUNCTION_EQ (DBPrintf, OSReport_crippled),
 	HLE_FUNCTION_EQ (__DSP_debug_printf, OSReport_crippled),
+	HLE_FUNCTION_EQ (Console_printf, OSReport_crippled),
 
 	HLE_FUNCTION (DVDOpen_ignore_movies),
 	HLE_FUNCTION (DVDConvertPathToEntrynum_ignore_movies),
@@ -187,7 +188,7 @@ MapItem *map_item_create (__u32 address, __u32 size, char *name)
 	MapItem *mi;
 
 
-	mi = calloc (1, sizeof (MapItem));
+	mi = (MapItem *) calloc (1, sizeof (MapItem));
 	mi->address = address;
 	mi->size = size;
 
@@ -214,14 +215,51 @@ MapItem *map_add_item (Map *map, __u32 address, __u32 size, char *name)
 	MapItem *mi;
 
 
-	if (!map || (map->nitems == MAX_MAP_ITEMS))
+	if (!map || (map->nitems == map->maxitems))
 		return NULL;
+
+	if (size > 0x80000000)
+	// size is actually the end address
+		size -= address;
+
+	mi = map->items_by_mem[(address & MEM_MASK) >> 2];
+	if (mi)
+	{
+		map_item_modify (mi, address, size, name);
+		map->modified = TRUE;
+
+		return mi;
+	}
 
 	mi = map_item_create (address, size, name);
 	mi->num = map->nitems++;
 
 	map->items_by_num[mi->num] = mi;
 	map->items_by_mem[(address & MEM_MASK) >> 2] = mi;
+	
+	map->modified = TRUE;
+	
+	return mi;
+}
+
+
+// used for function database
+MapItem *map_add_item_nomem (Map *map, __u32 address, __u32 size, char *name)
+{
+	MapItem *mi;
+
+
+	if (!map || (map->nitems == map->maxitems))
+		return NULL;
+
+	if (size > 0x80000000)
+	// size is actually the end address
+		size -= address;
+
+	mi = map_item_create (address, size, name);
+	mi->num = map->nitems++;
+
+	map->items_by_num[mi->num] = mi;
 	
 	map->modified = TRUE;
 	
@@ -257,8 +295,26 @@ void map_item_modify (MapItem *mi, __u32 address, __u32 size, char *name)
 
 Map *map_create (char *filename)
 {
-	Map *map = calloc (1, sizeof (Map));
+	Map *map = (Map *) calloc (1, sizeof (Map));
 
+
+	map->maxitems = MAX_MAP_ITEMS;
+	map->items_by_num = (MapItem **) calloc (map->maxitems, sizeof (MapItem *));
+
+	if (filename)
+		map->filename = strdup (filename);
+
+	return map;
+}
+
+
+Map *map_create_size (char *filename, int nitems)
+{
+	Map *map = (Map *) calloc (1, sizeof (Map));
+
+
+	map->maxitems = nitems + 1000;
+	map->items_by_num = (MapItem **) calloc (map->maxitems, sizeof (MapItem *));
 
 	if (filename)
 		map->filename = strdup (filename);
@@ -278,15 +334,34 @@ void map_destroy (Map *map)
 	for (i = 0; i < map->nitems; i++)
 		map_item_destroy (map->items_by_num[i]);
 
+	free (map->items_by_num);
 	free (map->filename);
 	free (map);
 }
 
 
+void mdb_destroy (MapDBItem *mdb)
+{
+	int i = 0;
+
+
+	if (!mdb)
+		return;
+
+	while (mdb[i].size)
+	{
+		free ((char *) mdb[i].name);
+		i++;
+	}
+
+	free (mdb);
+}
+
+
 Map *map_load_full (char *filename)
 {
+	static char buff[4096], path[4096], line[4096] = {0};
 	FILE *f;
-	char buff[4096], path[4096], line[4096] = {0};
 	__u32 address, size;
 	int i = 0;
 	Map *map;
@@ -348,8 +423,8 @@ Map *map_load_full (char *filename)
 
 Map *map_load (char *filename)
 {
+	static char buff[4096], line[4096], path[4096];
 	FILE *f;
-	char buff[4096], line[4096], path[4096];
 	__u32 address, size;
 	Map *map;
 	int gendb = FALSE;
@@ -376,12 +451,18 @@ Map *map_load (char *filename)
 		fscanf (f, " %4096[^\n]\n", line);
 
 		// if 17th char is not space, assume its address / name
-		if (strlen (line) > 17 && line[17] == ' ')
+		if ((strlen (line) > 17) && (line[17] == ' '))
 		{
 			if (3 == sscanf (line, "%x %x %4096s\n", &address, &size, buff))
+			{
+				if (strlen (buff) < 3)
+					if (3 != sscanf (line, "%x %x %*d %4096s\n", &address, &size, buff))
+						continue;
+
 				// sanity check
 				if (address >= 0x80000000)
 					map_add_item (map, address, size, buff);
+			}
 		}
 		else
 		{
@@ -562,6 +643,26 @@ MapItem *map_find_item_by_crc_and_size (Map *map, __u32 crc, __u32 size, MapItem
 }
 
 
+MapDBItem *mdb_find_item (MapDBItem *mdb, __u32 crc, __u32 size)
+{
+	int i = 0;
+
+
+	if (!mdb)
+		return NULL;
+
+	while (mdb[i].size)
+	{
+		if ((mdb[i].crc == crc) && (mdb[i].size == size))
+			return &mdb[i];
+	
+		i++;
+	}
+
+	return NULL;
+}
+
+
 __u32 calc_function_size (__u32 addr)
 {
 	__u32 start = addr, min_end = 0, t, op;
@@ -597,7 +698,7 @@ __u32 calc_function_size (__u32 addr)
 void map_item_generate_db (MapItem *mi)
 {
 	__u32 addr, op;
-	int i, k;
+	unsigned int i, k;
 
 
 	if (!mi)
@@ -700,19 +801,18 @@ int map_save_db (Map *map, char *filename)
 }
 
 
-Map *map_load_db (char *filename)
+MapDBItem *mdb_load (char *filename)
 {
+	static char name[1024];
 	FILE *f;
-	char name[256], line[1024];
 	__u32 size, crc;
-	Map *map;
-	MapItem *mi;
+	MapDBItem *mdb;
+	int n = 0;
 
 
 	if (!file_exists (filename))
 		return NULL;
 
-	map = map_create (filename);
 	f = fopen (filename, "r");
 	if (!f)
 	{
@@ -726,56 +826,30 @@ Map *map_load_db (char *filename)
 		
 		filename = path;
 	}
-	
+
 	while (!feof (f))
 	{
-		fscanf (f, " %[^\n]\n", line);
+		fgets (name, sizeof (name), f);
+		n++;
+	}
+	rewind (f);
 
-		if (3 == sscanf (line, "%x %x %s\n", &size, &crc, name))
+	mdb = (MapDBItem *) calloc (n + 1, sizeof (MapDBItem *));
+	n = 0;
+	while (!feof (f))
+	{
+		if (3 == fscanf (f, "%x %x %1024s\n", &size, &crc, name))
 		{
-			mi = map_add_item (map, 0, size, name);
-			mi->crc = crc;
+			mdb[n].size = size;
+			mdb[n].crc = crc;
+			mdb[n].name = strdup (name);
+			n++;
 		}
 	}
 	
 	fclose (f);
-	
-	map->modified = FALSE;
-	return map;
-}
 
-
-// extract database from buffer
-Map *map_extract_db (const char *m)
-{
-	char name[256], line[1024];
-	__u32 size, crc;
-	Map *map;
-	MapItem *mi;
-	unsigned int p = 0, t, len;
-
-
-	if (!m)
-		return NULL;
-
-	map = map_create (NULL);
-	
-	len = strlen (m);
-	while (p < len)
-	{
-		sscanf (&m[p], " %[^\n]\n%n", line, &t);
-		p += t;
-
-		if (3 == sscanf (line, "%x %x %s\n", &size, &crc, name))
-		{
-			mi = map_add_item (map, 0, size, name);
-			mi->crc = crc;
-		}
-	}
-	
-	map->modified = FALSE;
-	map->db_generated = TRUE;
-	return map;
+	return mdb;
 }
 
 
@@ -845,10 +919,11 @@ MapItem *map_find_item_by_crc_unnamed (Map *map, __u32 crc, MapItem *start)
 }
 
 
-void map_generate_names (Map *map, Map *db)
+void map_generate_names (Map *map, MapDBItem *db)
 {
 	int i;
 	MapItem *mi, *mf;
+	MapDBItem *mb;
 
 
 	// remove doubled
@@ -878,9 +953,9 @@ void map_generate_names (Map *map, Map *db)
 
 	for (i = 0; i < map->nitems; i++)
 		if ((mi = map->items_by_num[i]) && !mi->name)
-			if ((mf = map_find_item_by_crc_and_size (db, mi->crc, mi->size, NULL)))
+			if ((mb = mdb_find_item (db, mi->crc, mi->size)))
 			{
-				map_item_modify (mi, mi->address, mi->size, mf->name);
+				map_item_modify (mi, mi->address, mi->size, (char *) mb->name);
 				DEBUG (EVENT_DEBUG_MSG, "found: %.8x %.8x %s", mi->address, mi->size, mi->name);
 			}
 	
@@ -1039,7 +1114,7 @@ int hle_function (Map *map, const char *name, int attach)
 
 void hle_execute (__u32 opcode)
 {
-	int n = opcode & 0x03ffffff;
+	__u32 n = opcode & 0x03ffffff;
 
 
 	if (n < sizeof (hle_functions) / sizeof (HLEFunction))
@@ -1052,7 +1127,7 @@ void hle_execute (__u32 opcode)
 
 void hle_reattach (__u32 opcode)
 {
-	int n = opcode & 0x03ffffff;
+	__u32 n = opcode & 0x03ffffff;
 
 
 	if (n < sizeof (hle_functions) / sizeof (HLEFunction))

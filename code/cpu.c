@@ -18,8 +18,8 @@
  *
  *  missing:
  *    proper handling of FPSCR
- *
- *
+ *  known bugs:
+ *    lwarx and stwcx. not emulated correctly
  */
 
 
@@ -41,7 +41,8 @@ void (*op63[2048]) (__u32);
 // precalculated masks
 __u32 mask[32][32];
 
-double (*fp_round[]) (double) = { round, trunc, ceil, floor };
+//double (*fp_round[]) (double) = { round, trunc, ceil, floor };
+double(*fp_round[]) (double) = { rint, rint, ceil, floor };
 #define FP_ROUND(D)		(fp_round[FPSCR_RN] (D))
 
 #if 0
@@ -53,10 +54,10 @@ int fp_round_mode[] = { FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD, FE_DOWNWARD };
 #endif
 
 
-#define CHECK_FOR_FPU \
-({\
-	if (!(MSR & MSR_FP)) return cpu_exception_dont_advance (EXCEPTION_FP_UNAVAILABLE);\
-})
+#define CHECK_FOR_FPU	do { if (!(MSR & MSR_FP)) return cpu_exception_dont_advance (EXCEPTION_FP_UNAVAILABLE); } while (0)
+
+// how much to increase TB / decrease DEC every op
+#define TBINC			8
 
 
 // for lwarx and stwcx.
@@ -67,185 +68,50 @@ int fp_round_mode[] = { FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD, FE_DOWNWARD };
 #define RESERVE 					(CPUREGS (CPUREGS_PRIV + 0))
 #define RESERVE_ADDR			(CPUREGS (CPUREGS_PRIV + 1))
 
-//////////////////////////////////////////////////////////////////////////////
-// fix and clean this up
-#define refresh_delay			(CPUREGS (CPUREGS_PRIV + 2))
-#define pe_refresh				(CPUREGS (CPUREGS_PRIV + 3))
-#define vcount						(CPUREGS (CPUREGS_PRIV + 4))
-#define do_postretrace		(CPUREGS (CPUREGS_PRIV + 5))
-#define retrace_count			(CPUREGS (CPUREGS_PRIV + 6))
-#define fifo_count				(CPUREGS (CPUREGS_PRIV + 7))
-#define audio_count				(CPUREGS (CPUREGS_PRIV + 8))
-#define AUDIO_COUNT 			0x2ffff
-#define FIFO_COUNT 				0xaffff
-#define RETRACE_COUNT 		0xfffff
-
-int ref_delay = 110000;
-
-
-void zero_state (void)
-{
-	refresh_delay = 640*480*3;
-	retrace_count = RETRACE_COUNT;
-	fifo_count = FIFO_COUNT;
-	audio_count = AUDIO_COUNT;
-}
-
-
-void gcube_perf_vertices (int count)
-{
-	vcount += count;
-}
-
-
-void gcube_pe_refresh (void)
-{
-	pe_refresh = TRUE;
-
-	// refresh only if something was drawn
-	if (vcount)
-	{
-		refresh_delay = ref_delay;
-
-		vcount = 0;
-		video_refresh_nofb ();
-	}
-	else
-		video_input_check ();
-}
-
-
-void force_refresh (void)
-{
-	IC = refresh_delay;
-}
-
-
-void do_refresh (void)
-{
-	if (IC > refresh_delay)
-	{
-		IC = 0;
-		vi_refresh ();
-		if (!pe_refresh)
-			video_refresh ();
-	}
-}
-
-
-void (*vid_refresh) (void) = do_refresh;
-
-
-void refresh_manual (void)
-{
-	if (IC > 640*480*30)
-	{
-		refresh_delay = 640*480*5;
-		vid_refresh = do_refresh;
-	}
-}
-
-
-void gcube_refresh_manual (void)
-{
-	vid_refresh = refresh_manual;
-	// don't call vi interrupt too often
-	if (IC > 0xfff)
-	{
-		IC = 0;
-
-		if (!pe_refresh)
-			video_refresh ();
-
-		vi_refresh ();
-	}
-}
-
-
-void do_stuff (void)
-{
-		if (!audio_count--)
-		{
-			audio_count = AUDIO_COUNT;
-			dsp_generate_interrupt (DSP_INTERRUPT_AID);
-		}
-		
-		if (!fifo_count--)
-		{
-			fifo_count = FIFO_COUNT;
-
-			video_input_check ();
-			si_update_devices ();
-			dsp_update ();
-		}
-
-#if 0
-		if (!retrace_count--)
-		{
-			retrace_count = RETRACE_COUNT;
-# if 1
-			if (do_postretrace)
-			{
-				video_postretrace ();
-				do_postretrace = FALSE;
-			}
-			else
-			{
-				video_preretrace ();
-				do_postretrace = TRUE;
-			}
-# else
-			video_preretrace ();
-# endif
-		}
-#else
-	vid_refresh ();
-#endif
-}
-
-//////////////////////////////////////////////////////////////////////////////
-
 
 void cpu_exception (__u32 ex)
 {
+	// recoverable
 	MSR |= MSR_RI;
 
 	SRR0 = PC + 4;
 	SRR1 = MSR;
-	MSR &= ~MSR_EE;
-	PC = ex - 4;
+	MSR &= ~(MSR_POW | MSR_EE | MSR_PR | MSR_FP | MSR_FE0 | MSR_SE |
+					 MSR_BE | MSR_FE1 | MSR_IR | MSR_DR | MSR_PM | MSR_RI);
+	
+	PC = (MSR & MSR_IP) ? (ex | 0xfff00000) : ex;
+	// PC will advance in cpu_execute
+	PC -= 4;
 
-	DEBUG (EVENT_EXCEPTION, "cpu exception");
+	DEBUG (EVENT_EXCEPTION, "cpu exception %.8x", ex);
 }
 
 
 void cpu_exception_dont_advance (__u32 ex)
 {
-	MSR |= MSR_RI;
-
+	cpu_exception (ex);
 	// don't advance to next instruction
-	SRR0 = PC;
-	SRR1 = MSR;
-	MSR &= ~MSR_EE;
-	PC = ex - 4;
-
-	DEBUG (EVENT_EXCEPTION, "cpu exception");
+	SRR0 -= 4;
 }
 
 
 void decrementer_tick (void)
 {
-	if (--DEC == 0xffffffff)
+	if (DEC < TBINC)
 	{
 		if (MSR & MSR_EE)
+		{
 			cpu_exception (EXCEPTION_DECREMENTER);
+			DEBUG (EVENT_EXCEPTION, "decrementer exception");
+		}
 		
 		// zelda wind waker fix
 		DEC = 0x00100000;
+//		DEC = 0xffffffff;
 	}
 
-	if (++TBL == 0)
-		TBU++;
+	DEC -= TBINC;
+	TB += TBINC;
 }
 
 
@@ -254,13 +120,18 @@ void cpu_execute (void)
 	__u32 opcode;
 
 
-	opcode = MEM_RWORD (PC);
+	if (!mem_fetch (PC, &opcode))
+	{
+//		DEBUG (EVENT_EFATAL, ".cpu: unable to fetch opcode from PC %8.8x", PC);
+		PC += 4;
+		return;
+	}
+
 	op0[opcode >> 26] (opcode);
 
 	decrementer_tick ();
 
-	do_stuff ();
-	
+	hw_update ();
 	pi_check_for_interrupts ();
 
 	IC++;
@@ -279,7 +150,9 @@ OPCODE (NI)
 // error occured
 OPCODE (INVALID)
 {
+#ifdef GDEBUG
 	DEBUG (EVENT_EFATAL, ".cpu: invalid opcode (%.8x), PC = %.8x", OPC, PC);
+#endif
 }
 
 /*
@@ -965,10 +838,7 @@ OPCODE (DCBZ)
 	else
 		x = RRB;
 
-	MEM_WDOUBLE (x +  0, (__u64) 0);
-	MEM_WDOUBLE (x +  8, (__u64) 0);
-	MEM_WDOUBLE (x + 16, (__u64) 0);
-	MEM_WDOUBLE (x + 24, (__u64) 0);
+	mem_block_zero (x);
 }
 
 
@@ -993,7 +863,7 @@ OPCODE (DIVWO)
 		SET_XER_OV_SO;
 	else
 	{
-		if (rra == 0x80000000 && rrb == 0x7fffffff)
+		if ((rra == (__s32) 0x80000000) && (rrb == 0x7fffffff))
 			SET_XER_OV_SO;
 		else
 			CLEAR_XER_OV;
@@ -1024,7 +894,7 @@ OPCODE (DIVWOD)
 		SET_XER_OV_SO;
 	else
 	{
-		if (rra == 0x80000000 && rrb == 0x7fffffff)
+		if ((rra == (__s32) 0x80000000) && (rrb == 0x7fffffff))
 			SET_XER_OV_SO;
 		else
 			CLEAR_XER_OV;
@@ -1144,21 +1014,36 @@ OPCODE (LBZ)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RBYTE (GPR[ra] + SIMM) : MEM_RBYTE (SIMM);
+	if (MEM_RBYTE (&RRD, (ra) ? (GPR[ra] + SIMM) : SIMM))
+		RRD = (__u8) RRD;
 }
 
 
 // load byte and zero with update
 OPCODE (LBZU)
 {
-	RRD = MEM_RBYTE ((RRA += SIMM));
+	__u32 addr = RRA + SIMM;
+
+
+	if (MEM_RBYTE (&RRD, addr))
+	{
+		RRA = addr;
+		RRD = (__u8) RRD;
+	}
 }
 
 
 // load byte and zero with update indexed
 OPCODE (LBZUX)
 {
-	RRD = MEM_RBYTE ((RRA += RRB));
+	__u32 addr = RRA + RRB;
+
+
+	if (MEM_RBYTE (&RRD, addr))
+	{
+		RRA = addr;
+		RRD = (__u8) RRD;
+	}
 }
 
 
@@ -1168,7 +1053,8 @@ OPCODE (LBZX)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RBYTE (GPR[ra] + RRB) : MEM_RBYTE (RRB);
+	if (MEM_RBYTE (&RRD, (ra) ? (GPR[ra] + RRB) : RRB))
+		RRD = (__u8) RRD;
 }
 
 
@@ -1178,21 +1064,36 @@ OPCODE (LHA)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RHALF_S (GPR[ra] + SIMM) : MEM_RHALF_S (SIMM);
+	if (MEM_RHALF_S (&RRD, (ra) ? (GPR[ra] + SIMM) : SIMM))
+		RRD = (__s16) RRD;
 }
 
 
 // load half word algebraic with update
 OPCODE (LHAU)
 {
-	RRD = MEM_RHALF_S ((RRA += SIMM));
+	__u32 addr = RRA + SIMM;
+
+
+	if (MEM_RHALF_S (&RRD, addr))
+	{
+		RRA = addr;
+		RRD = (__s16) RRD;
+	}
 }
 
 
 // load half word algebraic with update indexed
 OPCODE (LHAUX)
 {
-	RRD = MEM_RHALF_S ((RRA += RRB));
+	__u32 addr = RRA + RRB;
+
+
+	if (MEM_RHALF_S (&RRD, addr))
+	{
+		RRA = addr;
+		RRD = (__s16) RRD;
+	}
 }
 
 
@@ -1202,7 +1103,8 @@ OPCODE (LHAX)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RHALF_S (GPR[ra] + RRB) : MEM_RHALF_S (RRB);
+	if (MEM_RHALF_S (&RRD, (ra) ? (GPR[ra] + RRB) : RRB))
+		RRD = (__s16) RRD;
 }
 
 
@@ -1212,7 +1114,8 @@ OPCODE (LHBRX)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RHALF_SR (GPR[ra] + RRB) : MEM_RHALF_SR (RRB);
+	if (MEM_RHALF_SR (&RRD, (ra) ? (GPR[ra] + RRB) : RRB))
+		RRD = (__s16) RRD;
 }
 
 
@@ -1222,21 +1125,36 @@ OPCODE (LHZ)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RHALF (GPR[ra] + SIMM) : MEM_RHALF (SIMM);
+	if (MEM_RHALF (&RRD, (ra) ? (GPR[ra] + SIMM) : SIMM))
+		RRD = (__u16) RRD;
 }
 
 
 // load half word and zero with update
 OPCODE (LHZU)
 {
-	RRD = MEM_RHALF ((RRA += SIMM));
+	__u32 addr = RRA + SIMM;
+
+
+	if (MEM_RHALF (&RRD, addr))
+	{
+		RRA = addr;
+		RRD = (__u16) RRD;
+	}
 }
 
 
 // load half word and zero with update indexed
 OPCODE (LHZUX)
 {
-	RRD = MEM_RHALF ((RRA += RRB));
+	__u32 addr = RRA + RRB;
+
+
+	if (MEM_RHALF (&RRD, addr))
+	{
+		RRA = addr;
+		RRD = (__u16) RRD;
+	}
 }
 
 
@@ -1246,7 +1164,8 @@ OPCODE (LHZX)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RHALF (GPR[ra] + RRB) : MEM_RHALF (RRB);
+	if (MEM_RHALF (&RRD, (ra) ? (GPR[ra] + RRB) : RRB))
+		RRD = (__u16) RRD;
 }
 
 
@@ -1261,7 +1180,8 @@ OPCODE (LMW)
 	ea = (ea) ? GPR[ea] + SIMM : SIMM;
 
 	for (r = RD; r < 32; r++, ea += 4)
-		GPR[r] = MEM_RWORD (ea);
+		if (!MEM_RWORD (&GPR[r], ea))
+			return;
 }
 
 
@@ -1277,11 +1197,16 @@ OPCODE (LSWI)
 	ea = (ea) ? GPR[ea] : 0;
 
 	for (i = 0; i < n/4; i++, rd++, ea += 4)
-		GPR[rd & 0x1f] = MEM_RWORD (ea);
+		if (!MEM_RWORD (&GPR[rd & 0x1f], ea))
+			return;
 
 	// load (n%4) bytes into the register and clear other 4-(n%4) bytes
 	if (n & 3)
-		GPR[rd & 0x1f] = MEM_RWORD (ea) &~ (0xffffffff << ((n & 3) << 3));
+	{
+		rd &= 0x1f;
+		if (MEM_RWORD (&GPR[rd], ea))
+			GPR[rd] &= ~(0xffffffff << ((n & 3) << 3));
+	}
 }
 
 
@@ -1295,11 +1220,16 @@ OPCODE (LSWX)
 	ea = (ea) ? (GPR[ea] + RRB) : RRB;
 
 	for (i = 0; i < n/4; i++, rd++, ea += 4)
-		GPR[rd & 0x1f] = MEM_RWORD (ea);
+		if (!MEM_RWORD (&GPR[rd & 0x1f], ea))
+			return;
 
 	// load (n%4) bytes into the register and clear other 4-(n%4) bytes
 	if (n & 3)
-		GPR[rd & 0x1f] = MEM_RWORD (ea) &~ (0xffffffff << ((n & 3) << 3));
+	{
+		rd &= 0x1f;
+		if (MEM_RWORD (&GPR[rd], ea))
+			GPR[rd] &= ~(0xffffffff << ((n & 3) << 3));
+	}
 }
 
 
@@ -1311,7 +1241,7 @@ OPCODE (LWARX)
 
 
 	ea = (ra) ? (GPR[ra] + RRB) : RRB;
-	RRD = MEM_RWORD (ea);
+	MEM_RWORD (&RRD, ea);
 
 	RESERVE = 1;
 	RESERVE_ADDR = ea;
@@ -1324,7 +1254,7 @@ OPCODE (LWBRX)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RWORD_R (GPR[ra] + RRB) : MEM_RWORD_R (RRB);
+	MEM_RWORD_R (&RRD, (ra) ? (GPR[ra] + RRB) : RRB);
 }
 
 
@@ -1334,21 +1264,29 @@ OPCODE (LWZ)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RWORD (GPR[ra] + SIMM) : MEM_RWORD (SIMM);
+	MEM_RWORD (&RRD, (ra) ? (GPR[ra] + SIMM) : SIMM);
 }
 
 
 // load word and zero with update
 OPCODE (LWZU)
 {
-	RRD = MEM_RWORD ((RRA += SIMM));
+	__u32 addr = RRA + SIMM;
+
+
+	if (MEM_RWORD (&RRD, addr))
+		RRA = addr;
 }
 
 
 // load word and zero with update indexed
 OPCODE (LWZUX)
 {
-	RRD = MEM_RWORD ((RRA += RRB));
+	__u32 addr = RRA + RRB;
+
+
+	if (MEM_RWORD (&RRD, addr))
+		RRA = addr;
 }
 
 
@@ -1358,7 +1296,7 @@ OPCODE (LWZX)
 	unsigned int ra = RA;
 
 
-	RRD = (ra) ? MEM_RWORD (GPR[ra] + RRB) : MEM_RWORD (RRB);
+	MEM_RWORD (&RRD, (ra) ? (GPR[ra] + RRB) : RRB);
 }
 
 
@@ -1483,14 +1421,55 @@ OPCODE (MTSPR)
 		case 9:
 		// DEC
 		case 22:
-		// SDR1 *
-		case 25:
 		// SRR0
 		case 26:
 		// SRR1
 		case 27:
 		// SPRG0
 		case 272:
+		// SPRG1
+		case 273:
+		// SPRG2
+		case 274:
+		// SPRG3
+		case 275:
+		// GQR0 - GQR7
+		case 912:
+		case 913:
+		case 914:
+		case 915:
+		case 916:
+		case 917:
+		case 918:
+		case 919:
+		// HID2
+		case 920:
+		// DMAU
+		case 922:
+		// MMCR0 - monitor mode control
+		case 952:
+		// PMC1 - performance monitor counter
+		case 953:
+		// PMC2
+		case 954:
+		// SIA - sampled instruction address
+		case 955:
+		// MMCR1
+		case 956:
+		// PMC3
+		case 957:
+		// PMC4
+		case 958:
+		// SDA *
+		case 959:
+		// HID0
+		case 1008:
+		// HID1
+		case 1009:
+		// L2CR
+		case 1017:
+			break;
+
 		// IBAT0U - instruction block address translation
 		case 528:
 		// IBAT0L
@@ -1523,41 +1502,13 @@ OPCODE (MTSPR)
 		case 542:
 		// DBAT3L
 		case 543:
-		// GQR0 - GQR7
-		case 912:
-		case 913:
-		case 914:
-		case 915:
-		case 916:
-		case 917:
-		case 918:
-		case 919:
-		// HID2
-		case 920:
-		// DMAU
-		case 922:
-		// MMCR0 - monitor mode control
-		case 952:
-		// PMC1 - performance monitor counter
-		case 953:
-		// PMC2
-		case 954:
-		// SIA - sampled instruction address
-		case 955:
-		// MMCR1
-		case 956:
-		// PMC3
-		case 957:
-		// PMC4
-		case 958:
-		// SDA *
-		case 959:
-		// HID0
-		case 1008:
-		// L2CR
-		case 1017:
 			break;
 
+		
+		// SDR1
+		case 25:
+			break;
+	
 		// WPAR
 		case 921:
 			cp_wpar_redirect (RRS);
@@ -1710,7 +1661,7 @@ OPCODE (NEGO)
 	__s32 rra = RRA;
 
 
-	if (rra == 0x80000000)
+	if (rra == (__s32) 0x80000000)
 		SET_XER_OV_SO;
 	else
 		CLEAR_XER_OV;
@@ -1732,7 +1683,7 @@ OPCODE (NEGOD)
 	__s32 rra = RRA;
 
 
-	if (rra == 0x80000000)
+	if (rra == (__s32) 0x80000000)
 		SET_XER_OV_SO;
 	else
 		CLEAR_XER_OV;
@@ -2009,24 +1960,29 @@ OPCODE (STB)
 	unsigned int ra = RA;
 
 
-	if (ra)
-		MEM_WBYTE (GPR[ra] + SIMM, RRS);
-	else
-		MEM_WBYTE (SIMM, RRS);
+	MEM_WBYTE ((ra) ? (GPR[ra] + SIMM) : SIMM, RRS);
 }
 
 
 // store byte with update
 OPCODE (STBU)
 {
-	MEM_WBYTE ((RRA += SIMM), RRS);
+	__u32 addr = RRA + SIMM;
+
+
+	if (MEM_WBYTE (addr, RRS))
+		RRA = addr;
 }
 
 
 // store byte with update indexed
 OPCODE (STBUX)
 {
-	MEM_WBYTE ((RRA += RRB), RRS);
+	__u32 addr = RRA + RRB;
+
+
+	if (MEM_WBYTE (addr, RRS))
+		RRA = addr;
 }
 
 
@@ -2036,10 +1992,7 @@ OPCODE (STBX)
 	unsigned int ra = RA;
 
 
-	if (ra)
-		MEM_WBYTE (GPR[ra] + RRB, RRS);
-	else
-		MEM_WBYTE (RRB, RRS);
+	MEM_WBYTE ((ra) ? (GPR[ra] + RRB) : RRB, RRS);
 }
 
 
@@ -2049,10 +2002,7 @@ OPCODE (STH)
 	unsigned int ra = RA;
 
 
-	if (ra)
-		MEM_WHALF (GPR[ra] + SIMM, RRS);
-	else
-		MEM_WHALF (SIMM, RRS);
+	MEM_WHALF ((ra) ? (GPR[ra] + SIMM) : SIMM, RRS);
 }
 
 
@@ -2062,24 +2012,29 @@ OPCODE (STHBRX)
 	unsigned int ra = RA;
 
 
-	if (ra)
-		MEM_WHALF_R (GPR[ra] + RRB, RRS);
-	else
-		MEM_WHALF_R (RRB, RRS);
+	MEM_WHALF_R ((ra) ? (GPR[ra] + RRB) : RRB, RRS);
 }
 
 
 // store half word with update
 OPCODE (STHU)
 {
-	MEM_WHALF ((RRA += SIMM), RRS);
+	__u32 addr = RRA + SIMM;
+
+
+	if (MEM_WHALF (addr, RRS))
+		RRA = addr;
 }
 
 
 // store half word with update indexed
 OPCODE (STHUX)
 {
-	MEM_WHALF ((RRA += RRB), RRS);
+	__u32 addr = RRA + RRB;
+
+
+	if (MEM_WHALF (addr, RRS))
+		RRA = addr;
 }
 
 
@@ -2089,10 +2044,7 @@ OPCODE (STHX)
 	unsigned int ra = RA;
 
 
-	if (ra)
-		MEM_WHALF (GPR[ra] + RRB, RRS);
-	else
-		MEM_WHALF (RRB, RRS);
+	MEM_WHALF ((ra) ? (GPR[ra] + RRB) : RRB, RRS);
 }
 
 
@@ -2107,7 +2059,8 @@ OPCODE (STMW)
 	ea = (ea) ? GPR[ea] + SIMM : SIMM;
 
 	for (r = RS; r < 32; r++, ea += 4)
-		MEM_WWORD (ea, GPR[r]);
+		if (!MEM_WWORD (ea, GPR[r]))
+			return;
 }
 
 
@@ -2124,11 +2077,13 @@ OPCODE (STSWI)
 	ea = (ea) ? GPR[ea] : 0;
 
 	for (i = 0; i < n/4; i++, rd++, ea += 4)
-		MEM_WWORD (ea, GPR[rd & 0x1f]);
+		if (!MEM_WWORD (ea, GPR[rd & 0x1f]))
+			return;
 
 	cr = (char *) &GPR[rd & 0x1f];
 	for (i = 0; i < (n & 3); i++, ea++, cr++)
-		MEM_WBYTE (ea, *cr);
+		if (!MEM_WBYTE (ea, *cr))
+			return;
 }
 
 
@@ -2143,11 +2098,13 @@ OPCODE (STSWX)
 	ea = (ea) ? (GPR[ea] + RRB) : RRB;
 
 	for (i = 0; i < n/4; i++, rd++, ea += 4)
-		MEM_WWORD (ea, GPR[rd & 0x1f]);
+		if (!MEM_WWORD (ea, GPR[rd & 0x1f]))
+			return;
 
 	cr = (char *) &GPR[rd & 0x1f];
 	for (i = 0; i < (n & 3); i++, ea++, cr++)
-		MEM_WBYTE (ea, *cr);
+		if (!MEM_WBYTE (ea, *cr))
+			return;
 }
 
 
@@ -2157,10 +2114,7 @@ OPCODE (STW)
 	unsigned int ra = RA;
 
 
-	if (ra)
-		MEM_WWORD (GPR[ra] + SIMM, RRS);
-	else
-		MEM_WWORD (SIMM, RRS);
+	MEM_WWORD ((ra) ? (GPR[ra] + SIMM) : SIMM, RRS);
 }
 
 
@@ -2170,10 +2124,7 @@ OPCODE (STWBRX)
 	unsigned int ra = RA;
 
 
-	if (ra)
-		MEM_WWORD_R (GPR[ra] + RRB, RRS);
-	else
-		MEM_WWORD_R (RRB, RRS);
+	MEM_WWORD_R ((ra) ? (GPR[ra] + RRB) : RRB, RRS);
 }
 
 
@@ -2187,7 +2138,9 @@ OPCODE (STWCXD)
 	ea = (ra) ? (GPR[ra] + RRB) : RRB;
 	if (RESERVE && RESERVE_ADDR == ea)
 	{
-		MEM_WWORD (ea, RRS);
+		if (!MEM_WWORD (ea, RRS))
+			return;
+
 		SET_CR0 ((RESERVE << 1) | IS_XER_SO);
 		RESERVE = 0;
 	}
@@ -2199,14 +2152,22 @@ OPCODE (STWCXD)
 // store word with update
 OPCODE (STWU)
 {
-	MEM_WWORD ((RRA += SIMM), RRS);
+	__u32 addr = RRA + SIMM;
+
+
+	if (MEM_WWORD (addr, RRS))
+		RRA = addr;
 }
 
 
 // store word with update indexed
 OPCODE (STWUX)
 {
-	MEM_WWORD ((RRA += RRB), RRS);
+	__u32 addr = RRA + RRB;
+
+
+	if (MEM_WWORD (addr, RRS))
+		RRA = addr;
 }
 
 
@@ -2216,10 +2177,7 @@ OPCODE (STWX)
 	unsigned int ra = RA;
 
 
-	if (ra)
-		MEM_WWORD (GPR[ra] + RRB, RRS);
-	else
-		MEM_WWORD (RRB, RRS);
+	MEM_WWORD ((ra) ? (GPR[ra] + RRB) : RRB, RRS);
 }
 
 
@@ -2883,23 +2841,31 @@ OPCODE (LFD)
 
 
 	CHECK_FOR_FPU;
-	FRD = (ra) ? MEM_RDOUBLE_F (GPR[ra] + SIMM) : MEM_RDOUBLE_F (SIMM);
+	MEM_RDOUBLE (&FRD, (ra) ? (GPR[ra] + SIMM) : SIMM);
 }
 
 
 // load floating-point double with update
 OPCODE (LFDU)
 {
+	__u32 addr = RRA + SIMM;
+
+
 	CHECK_FOR_FPU;
-	FRD = MEM_RDOUBLE_F ((RRA += SIMM));
+	if (MEM_RDOUBLE (&FRD, addr))
+		RRA = addr;
 }
 
 
 // load floating-point double with update indexed
 OPCODE (LFDUX)
 {
+	__u32 addr = RRA + RRB;
+
+
 	CHECK_FOR_FPU;
-	FRD = MEM_RDOUBLE_F ((RRA += RRB));
+	if (MEM_RDOUBLE (&FRD, addr))
+		RRA = addr;
 }
 
 
@@ -2910,7 +2876,7 @@ OPCODE (LFDX)
 
 
 	CHECK_FOR_FPU;
-	FRD = (ra) ? MEM_RDOUBLE_F (GPR[ra] + RRB) : MEM_RDOUBLE_F (RRB);
+	MEM_RDOUBLE (&FRD, (ra) ? (GPR[ra] + RRB) : RRB);
 }
 
 
@@ -2922,31 +2888,58 @@ OPCODE (LFS)
 
 	CHECK_FOR_FPU;
 	if (PSE)
-		PS0D = PS1D = (ra) ? MEM_RSINGLE_F (GPR[ra] + SIMM) : MEM_RSINGLE_F (SIMM);
+	{
+		MEM_RSINGLE (&PS0D, (ra) ? (GPR[ra] + SIMM) : SIMM);
+		PS1D = PS0D;
+	}
 	else
-		FRD = (ra) ? MEM_RSINGLE_F (GPR[ra] + SIMM) : MEM_RSINGLE_F (SIMM);
+		MEM_RSINGLE (&FRD, (ra) ? (GPR[ra] + SIMM) : SIMM);
 }
 
 
 // load floating-point single with update
 OPCODE (LFSU)
 {
+	__u32 addr = RRA + SIMM;
+
+
 	CHECK_FOR_FPU;
 	if (PSE)
-		PS0D = PS1D = MEM_RSINGLE_F ((RRA += SIMM));
+	{
+		if (MEM_RSINGLE (&PS0D, addr))
+		{
+			RRA = addr;
+			PS1D = PS0D;
+		}
+	}
 	else
-		FRD = MEM_RSINGLE_F ((RRA += SIMM));
+	{
+		if (MEM_RSINGLE (&FRD, addr))
+			RRA = addr;
+	}
 }
 
 
 // load floating-point single with update indexed
 OPCODE (LFSUX)
 {
+	__u32 addr = RRA + RRB;
+
+
 	CHECK_FOR_FPU;
 	if (PSE)
-		PS0D = PS1D = MEM_RSINGLE_F ((RRA += RRB));
+	{
+		if (MEM_RSINGLE (&PS0D, addr))
+		{
+			PS1D = PS0D;
+			RRA = addr;
+		}
+	}
 	else
-		FRD = MEM_RSINGLE_F ((RRA += RRB));
+	{
+		if (MEM_RSINGLE (&FRD, addr))
+			RRA = addr;
+	}
 }
 
 
@@ -2958,9 +2951,12 @@ OPCODE (LFSX)
 
 	CHECK_FOR_FPU;
 	if (PSE)
-		PS0D = PS1D = (ra) ? MEM_RSINGLE_F (GPR[ra] + RRB) : MEM_RSINGLE_F (RRB);
+	{
+		MEM_RSINGLE (&PS0D, (ra) ? (GPR[ra] + RRB) : RRB);
+		PS1D = PS0D;
+	}
 	else
-		FRD = (ra) ? MEM_RSINGLE_F (GPR[ra] + RRB) : MEM_RSINGLE_F (RRB);
+		MEM_RSINGLE (&FRD, (ra) ? (GPR[ra] + RRB) : RRB);
 }
 
 
@@ -2971,26 +2967,31 @@ OPCODE (STFD)
 
 
 	CHECK_FOR_FPU;
-	if (ra)
-		MEM_WDOUBLE (GPR[ra] + SIMM, FRS);
-	else
-		MEM_WDOUBLE (SIMM, FRS);
+	MEM_WDOUBLE ((ra) ? (GPR[ra] + SIMM) : SIMM, FRS);
 }
 
 
 // store floating-point double with update
 OPCODE (STFDU)
 {
+	__u32 addr = RRA + SIMM;
+
+
 	CHECK_FOR_FPU;
-	MEM_WDOUBLE ((RRA += SIMM), FRS);
+	if (MEM_WDOUBLE (addr, FRS))
+		RRA = addr;
 }
 
 
 // store floating-point double with update indexed
 OPCODE (STFDUX)
 {
+	__u32 addr = RRA + RRB;
+
+
 	CHECK_FOR_FPU;
-	MEM_WDOUBLE ((RRA += RRB), FRS);
+	if (MEM_WDOUBLE (addr, FRS))
+		RRA = addr;
 }
 
 
@@ -3001,10 +3002,7 @@ OPCODE (STFDX)
 
 
 	CHECK_FOR_FPU;
-	if (ra)
-		MEM_WDOUBLE (GPR[ra] + RRB, FRS);
-	else
-		MEM_WDOUBLE (RRB, FRS);
+	MEM_WDOUBLE ((ra) ? (GPR[ra] + RRB) : RRB, FRS);
 }
 
 
@@ -3015,10 +3013,7 @@ OPCODE (STFIWX)
 
 
 	CHECK_FOR_FPU;
-	if (ra)
-		MEM_WWORD (GPR[ra] + RRB, (__u32) FBS);
-	else
-		MEM_WWORD (RRB, (__u32) FBS);
+	MEM_WWORD ((ra) ? (GPR[ra] + RRB) : RRB, (__u32) FBS);
 }
 
 
@@ -3029,26 +3024,31 @@ OPCODE (STFS)
 
 
 	CHECK_FOR_FPU;
-	if (ra)
-		MEM_WSINGLE (GPR[ra] + SIMM, (float) FRS);
-	else
-		MEM_WSINGLE (SIMM, (float) FRS);
+	MEM_WSINGLE ((ra) ? (GPR[ra] + SIMM) : SIMM, (float) FRS);
 }
 
 
 // store floating-point single with update
 OPCODE (STFSU)
 {
+	__u32 addr = RRA + SIMM;
+
+
 	CHECK_FOR_FPU;
-	MEM_WSINGLE ((RRA += SIMM), (float) FRS);
+	if (MEM_WSINGLE (addr, (float) FRS))
+		RRA = addr;
 }
 
 
 // store floating-point single with update indexed
 OPCODE (STFSUX)
 {
+	__u32 addr = RRA + RRB;
+
+
 	CHECK_FOR_FPU;
-	MEM_WSINGLE ((RRA += RRB), (float) FRS);
+	if (MEM_WSINGLE (addr, (float) FRS))
+		RRA = addr;
 }
 
 
@@ -3059,10 +3059,7 @@ OPCODE (STFSX)
 
 
 	CHECK_FOR_FPU;
-	if (ra)
-		MEM_WSINGLE (GPR[ra] + RRB, (float) FRS);
-	else
-		MEM_WSINGLE (RRB, (float) FRS);
+	MEM_WSINGLE ((ra) ? (GPR[ra] + RRB) : RRB, (float) FRS);
 }
 
 
@@ -3423,30 +3420,44 @@ static const float dq_factor[] =
 
 #define QLOAD(ea,offset,type,scale,dest)		\
 	({\
+		int ret = 0;\
 		switch (type)\
 		{\
 			case 0:\
-				*(dest) = MEM_RSINGLE_F (ea + (offset << 2));\
+				ret = MEM_RSINGLE (dest, ea + (offset << 2));\
 				break;\
 			case 4:\
-				*(dest) = (double) MEM_RBYTE (ea + offset);\
-				*(dest) *= dq_factor[scale];\
+				{\
+					__u8 data;\
+					ret = MEM_RBYTE (&data, ea + offset);\
+					*(dest) = dq_factor[scale] * data;\
+				}\
 				break;\
 			case 5:\
-				*(dest) = (double) MEM_RHALF (ea + (offset << 1));\
-				*(dest) *= dq_factor[scale];\
+				{\
+					__u16 data;\
+					ret = MEM_RHALF (&data, ea + (offset << 1));\
+					*(dest) = dq_factor[scale] * data;\
+				}\
 				break;\
 			case 6:\
-				*(dest) = (double) (__s8) MEM_RBYTE (ea + offset);\
-				*(dest) *= dq_factor[scale];\
+				{\
+					__s8 data;\
+					ret = MEM_RBYTE (&data, ea + offset);\
+					*(dest) = dq_factor[scale] * data;\
+				}\
 				break;\
 			case 7:\
-				*(dest) = (double) (__s16) MEM_RHALF (ea + (offset << 1));\
-				*(dest) *= dq_factor[scale];\
+				{\
+					__s16 data;\
+					ret = MEM_RHALF (&data, ea + (offset << 1));\
+					*(dest) = dq_factor[scale] * data;\
+				}\
 				break;\
 			default:\
 				DEBUG (EVENT_EMAJOR, ".cpu: unhandled qload: (%d,%d)", type, scale);\
 		}\
+	ret;\
 	})
 
 
@@ -3472,8 +3483,8 @@ OPCODE (PSQ_L)
 	}
 	else
 	{
-		QLOAD (ea, 0, type, scale, &PS0D);
-		QLOAD (ea, 1, type, scale, &PS1D);
+		if (QLOAD (ea, 0, type, scale, &PS0D))
+			QLOAD (ea, 1, type, scale, &PS1D);
 	}
 }
 
@@ -3489,17 +3500,23 @@ OPCODE (PSQ_LU)
 
 	type = LD_TYPE (PSI);
 	scale = LD_SCALE (PSI);
-	ea = (RRA += PSIMM);
+	ea = RRA + PSIMM;
 
 	if (PSW)
 	{
-		QLOAD (ea, 0, type, scale, &PS0D);
-		PS1D = 1.0f;
+		if (QLOAD (ea, 0, type, scale, &PS0D))
+		{
+			PS1D = 1.0f;
+			RRA = ea;
+		}
 	}
 	else
 	{
-		QLOAD (ea, 0, type, scale, &PS0D);
-		QLOAD (ea, 1, type, scale, &PS1D);
+		if (QLOAD (ea, 0, type, scale, &PS0D))
+		{
+			QLOAD (ea, 1, type, scale, &PS1D);
+			RRA = ea;
+		}
 	}
 }
 
@@ -3509,18 +3526,24 @@ OPCODE (PSQ_LUX)
 {
 	int type = LD_TYPE (PSXI);
 	int scale = LD_SCALE (PSXI);
-	__u32 ea = (RRA += RRB);
+	__u32 ea = RRA + RRB;
 
 		
 	if (PSXW)
 	{
-		QLOAD (ea, 0, type, scale, &PS0D);
-		PS1D = 1.0f;
+		if (QLOAD (ea, 0, type, scale, &PS0D))
+		{
+			PS1D = 1.0f;
+			RRA = ea;
+		}
 	}
 	else
 	{
-		QLOAD (ea, 0, type, scale, &PS0D);
-		QLOAD (ea, 1, type, scale, &PS1D);
+		if (QLOAD (ea, 0, type, scale, &PS0D))
+		{
+			QLOAD (ea, 1, type, scale, &PS1D);
+			RRA = ea;
+		}
 	}
 }
 
@@ -3543,8 +3566,8 @@ OPCODE (PSQ_LX)
 	}
 	else
 	{
-		QLOAD (ea, 0, type, scale, &PS0D);
-		QLOAD (ea, 1, type, scale, &PS1D);
+		if (QLOAD (ea, 0, type, scale, &PS0D))
+			QLOAD (ea, 1, type, scale, &PS1D);
 	}
 }
 
@@ -3627,28 +3650,29 @@ static const float q_factor[] =
 
 #define QSTORE(ea,offset,type,s,dest)		\
 	({\
+		int ret = 0;\
 		switch (type)\
 		{\
 			case 0:\
-				MEM_WSINGLE (ea + (offset << 2), (float) dest);\
+				ret = MEM_WSINGLE (ea + (offset << 2), (float) dest);\
 				break;\
 			case 4:\
-				MEM_WBYTE (ea + offset, (__u8) CLAMP (q_factor[s] * dest, 0, 0xff));\
+				ret = MEM_WBYTE (ea + offset, (__u8) CLAMP (q_factor[s] * dest, 0, 0xff));\
 				break;\
 			case 5:\
-				MEM_WHALF (ea + (offset << 1), (__u16) CLAMP (q_factor[s] * dest, 0, 0xffff));\
+				ret = MEM_WHALF (ea + (offset << 1), (__u16) CLAMP (q_factor[s] * dest, 0, 0xffff));\
 				break;\
 			case 6:\
-				MEM_WBYTE (ea + offset, (__s8) CLAMP (q_factor[s] * dest, MIN_S8, MAX_S8));\
+				ret = MEM_WBYTE (ea + offset, (__s8) CLAMP (q_factor[s] * dest, MIN_S8, MAX_S8));\
 				break;\
 			case 7:\
-				MEM_WHALF (ea + (offset << 1), (__s16) CLAMP (q_factor[s] * dest, MIN_S16, MAX_S16));\
+				ret = MEM_WHALF (ea + (offset << 1), (__s16) CLAMP (q_factor[s] * dest, MIN_S16, MAX_S16));\
 				break;\
 			default:\
 				DEBUG (EVENT_EMAJOR, ".cpu: unhandled qstore: (%d,%d)", type, scale);\
 		}\
+		ret;\
 	})
-
 
 
 // paired singles quantized store
@@ -3670,8 +3694,8 @@ OPCODE (PSQ_ST)
 		QSTORE (ea, 0, type, scale, PS0D);
 	else
 	{
-		QSTORE (ea, 0, type, scale, PS0D);
-		QSTORE (ea, 1, type, scale, PS1D);
+		if (QSTORE (ea, 0, type, scale, PS0D))
+			QSTORE (ea, 1, type, scale, PS1D);
 	}
 }
 
@@ -3687,14 +3711,20 @@ OPCODE (PSQ_STU)
 
 	type = LD_TYPE (PSI);
 	scale = LD_SCALE (PSI);
-	ea = (RRA += PSIMM);
+	ea = RRA + PSIMM;
 
 	if (PSW)
-		QSTORE (ea, 0, type, scale, PS0D);
+	{
+		if (QSTORE (ea, 0, type, scale, PS0D))
+			RRA = ea;
+	}
 	else
 	{
-		QSTORE (ea, 0, type, scale, PS0D);
-		QSTORE (ea, 1, type, scale, PS1D);
+		if (QSTORE (ea, 0, type, scale, PS0D))
+		{
+			QSTORE (ea, 1, type, scale, PS1D);
+			RRA = ea;
+		}
 	}
 }
 
@@ -3704,15 +3734,21 @@ OPCODE (PSQ_STUX)
 {
 	int type = LD_TYPE (PSXI);
 	int scale = LD_SCALE (PSXI);
-	__u32 ea = (RRA += RRB);
+	__u32 ea = RRA + RRB;
 
 
 	if (PSXW)
-		QSTORE (ea, 0, type, scale, PS0D);
+	{
+		if (QSTORE (ea, 0, type, scale, PS0D))
+			RRA = ea;
+	}
 	else
 	{
-		QSTORE (ea, 0, type, scale, PS0D);
-		QSTORE (ea, 1, type, scale, PS1D);
+		if (QSTORE (ea, 0, type, scale, PS0D))
+		{
+			QSTORE (ea, 1, type, scale, PS1D);
+			RRA = ea;
+		}
 	}
 }
 
@@ -3732,8 +3768,8 @@ OPCODE (PSQ_STX)
 		QSTORE (ea, 0, type, scale, PS0D);
 	else
 	{
-		QSTORE (ea, 0, type, scale, PS0D);
-		QSTORE (ea, 1, type, scale, PS1D);
+		if (QSTORE (ea, 0, type, scale, PS0D))
+			QSTORE (ea, 1, type, scale, PS1D);
 	}
 }
 
@@ -3788,11 +3824,32 @@ void cpu_init (void)
 	memset (ps0, 0, sizeof (ps0));
 	memset (ps1, 0, sizeof (ps1));
 
-	zero_state ();
-
+	TB = CALC_TB;
 	RSP = 0x816ffff0;
 	LR = EXCEPTION_SYSTEM_RESET;
 	MSR = MSR_FP;
+
+	// Dolphin OS setup (standard setup after Config24MB)
+	IBATU (0) = DBATU (0) = 0x800001ff;
+	IBATL (0) = DBATL (0) = 0x00000002;
+	IBATU (2) = DBATU (2) = 0x810000ff;
+	IBATL (2) = DBATL (2) = 0x01000002;
+
+	IBATU (1) = DBATU (1) = 0;
+	IBATL (1) = DBATL (1) = 0;
+	IBATU (3) = DBATU (3) = 0;
+	IBATL (3) = DBATL (3) = 0;
+
+	// adds
+	IBATU (1) = DBATU (1) = 0xc0001fff;
+	IBATL (1) = DBATL (1) = 0x00000002;
+	IBATU (3) = DBATU (3) = 0x000000ff;
+	IBATL (3) = DBATL (3) = 0x00000002;
+
+	PVR = (PVR_GEKKO << 16) | PVR_REVISION;
+
+	for (i = 0; i < 16; i++)
+		SR[i] = 0x2aa * i;
 
 	// precalc masks
 	for (i = 0; i < 32; i++)
@@ -3955,13 +4012,14 @@ void cpu_init (void)
 	OP4 (31,  1, 235, 0) = MULLWO;
 	OP4 (31,  1, 235, 1) = MULLWOD;
 	OP3 (31,     242, 0) = MTSRIN;
-//
+
 	OP3 (31,     246, 0) =  EMPTY;		// DCBTST - data cache block touch for store
+	OP3 (31,     247, 0) = STBUX;
+
 	OP4 (31,  0, 266, 0) = ADD;
 	OP4 (31,  0, 266, 1) = ADDD;
 	OP4 (31,  1, 266, 0) = ADDO;
 	OP4 (31,  1, 266, 1) = ADDOD;
-	OP3 (31,     274, 0) = STBUX;
 	OP3 (31,     278, 0) =  EMPTY;		// DCBT - data cache block touch
 	OP3 (31,     279, 0) = LHZX;
 	OP3 (31,     284, 0) = EQV;
@@ -4028,7 +4086,6 @@ void cpu_init (void)
 	OP3 (31,     954, 1) = EXTSBD;
 	OP3 (31,     982, 0) =  EMPTY;		// ICBI - instruction cache block invalidate
 	OP3 (31,     983, 0) = STFIWX;
-//	OP3 (31,    1014, 0) =  EMPTY;		// DCBZ - data cache block clear to zero
 	OP3 (31,    1014, 0) = DCBZ;
 
 	OP3 (59,  18, 0) = FDIVS;
@@ -4059,7 +4116,7 @@ void cpu_init (void)
 	OPR (63,  31, 0, 6, 11, FNMADD);
 	OP3 (63,  32, 0) = FCMPO;
 	OP3 (63,  38, 0) = MTFSB1;
-//
+
 	OP3 (63,  40, 0) = FNEG;
 	OP3 (63,  64, 0) = MCRFS;
 	OP3 (63,  70, 0) = MTFSB0;
@@ -4069,7 +4126,7 @@ void cpu_init (void)
 	OP3 (63, 264, 0) = FABS;
 	OP3 (63, 583, 0) = MFFS;
 	OP3 (63, 711, 0) = MTFSF;
-//
+
 	// additional gekko instructions
 	OP1 (56) = PSQ_L;
 	OP1 (57) = PSQ_LU;

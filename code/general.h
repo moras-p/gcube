@@ -97,8 +97,8 @@ char *kill_extension (char *filename);
 char *get_home_dir (void);
 
 __u32 round_up (__u32 a, __u32 b);
-inline int is_power_of_two (__u32 a);
-int closest_upper_power_of_two (__u32 a);
+int is_power_of_two (__u32 a);
+unsigned int closest_upper_power_of_two (__u32 a);
 
 __u32 crc_setup (unsigned int bits);
 __u32 crc_iterate (__u32 crc, __u8 d);
@@ -115,6 +115,8 @@ int magic_num_eq (MagicNum *a, MagicNum *b);
 __u32 magic_num_xmagic (MagicNum *m);
 
 char *f2str (const char *filename);
+
+void file_cat (const char *filename, void *data, __u32 size);
 
 
 #endif // __GENERAL_H

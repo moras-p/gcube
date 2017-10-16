@@ -164,7 +164,7 @@ void vi_w32_xfb1 (__u32 addr, __u32 data)
 {
 	DEBUG (EVENT_LOG_VI, "..vi: xfb 1 address set to 0x%.8x", data);
 
-	video_set_framebuffer (MEM_ADDRESS (data));
+	video_set_framebuffer ((__u8 *) MEM_ADDRESS (data));
 	
 	RVI32 (addr) = data;
 }
@@ -183,7 +183,7 @@ void vi_w16_xfb1 (__u32 addr, __u16 data)
 	RVI16 (addr) = data;
 	DEBUG (EVENT_LOG_VI, "..vi: xfb 1 address set to 0x%.8x", RVI32 (0x201c));
 
-	video_set_framebuffer (MEM_ADDRESS (RVI32 (0x201c)));
+	video_set_framebuffer ((__u8 *) MEM_ADDRESS (RVI32 (0x201c)));
 }
 
 
@@ -194,7 +194,20 @@ void vi_w16_xfb2 (__u32 addr, __u16 data)
 }
 
 
+/*
+// VIGetCurrentLine
+// vct and hct are always masked with 0x7ff
+1. wait until (this_vct == last_vct)
+// modes magic values
+mheight = 429
+mwidth  = 525
+2. vpos = ((vct - 1) << 1) + ((hct - 1) / mheight)
+3. if (vpos > mwidth) vpos -= mwidth;
+4. ret (vpos >> 1)
+*/
+
 // get current vertical position
+/*
 __u16 vi_r16_vct (__u32 addr)
 {
 	// fake vsync
@@ -227,7 +240,42 @@ __u16 vi_r16_hct (__u32 addr)
 {
 	return (RVI16 (VI_HCT) ^= 639);
 }
+*/
+__u16 vi_r16_vct (__u32 addr)
+{
+	// fake vsync
+	if (RVI16 (VI_VCT) == 0)
+		return (RVI16 (VI_VCT) = 1);
+	else if (RVI16 (VI_VCT) == 1)
+	{
+		RVI16 (VI_VCT) = 100;
+		return 1;
+	}
+	else if (RVI16 (VI_VCT) == 100)
+		return (RVI16 (VI_VCT) = 200);
+	else if (RVI16 (VI_VCT) == 200)
+		return (RVI16 (VI_VCT) = 522);
+	else if (RVI16 (VI_VCT) == 522)
+		return (RVI16 (VI_VCT) = 574);
+	else if (RVI16 (VI_VCT) == 574)
+	{
+		RVI16 (VI_VCT) = 575;
+		return 574;
+	}
+	else
+	{
+		gcube_refresh_manual ();
+		return (RVI16 (VI_VCT) = 1);
+	}
+}
 
+
+// current horizontal position of the beam
+__u16 vi_r16_hct (__u32 addr)
+{
+//	return (RVI16 (VI_HCT) ^= 639);
+	return ((RVI16 (VI_HCT) ^= 638) + 1);
+}
 
 __u32 vi_r32_vcthct (__u32 addr)
 {
@@ -241,7 +289,7 @@ __u32 vi_r32_vcthct (__u32 addr)
 
 void vi_set_video_mode (int mode)
 {
-	int i;
+	unsigned int i;
 
 
 	switch (mode)

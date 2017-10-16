@@ -110,6 +110,13 @@ inline void cp_check_marks (void)
 			n = -n;
 		b = CP_FIFO_WPOINTER - CP_FIFO_BASE - n;
 
+		// sanity check
+		if ((int) b < 0)
+		{
+			printf ("serious problem here\n");
+			exit (0);
+		}
+
 		if (b)
 			memmove (MEM_ADDRESS (CP_FIFO_BASE), MEM_ADDRESS (CP_FIFO_BASE + n), b);
 
@@ -247,6 +254,7 @@ void cp_w16_cr (__u32 addr, __u16 data)
 	if (data & CP_CR_CLEAR_BP)
 		RCP16 (CP_SR) &= ~CP_SR_BPINT;
 
+#if 1
 	if ((CPCR & CP_CR_RDEN) && CP_FIFO_RW_DIST)
 	{
 		DEBUG (EVENT_LOG_CP, "..cp: FIFO gp read enabled, parsing %.8x bytes from %.8x",
@@ -255,6 +263,7 @@ void cp_w16_cr (__u32 addr, __u16 data)
 		gx_parse_list (CP_FIFO_BASE, CP_FIFO_RW_DIST);
 		CP_FIFO_RW_DIST = 0;
 	}
+#endif
 }
 
 
