@@ -5,4 +5,4 @@ Open source Gamecube emulator
 -----------------------------
 
 Compilable with mingw under Windows. Visual Studio project files included.
-Requires SDL library.
+Requires SDL library and nvidia-cg-toolkit.
