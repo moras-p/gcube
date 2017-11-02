@@ -304,7 +304,6 @@
     <None Include="Makefile.rules" />
     <None Include="Makefile.win" />
     <None Include="README.md" />
-    <None Include="README.info" />
     <None Include="code\cg_fragment.cg">
       <Filter>Source Files</Filter>
     </None>

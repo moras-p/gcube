@@ -198,7 +198,6 @@
     <None Include="Makefile.rules" />
     <None Include="Makefile.win" />
     <None Include="README.debug" />
-    <None Include="README.info" />
     <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
