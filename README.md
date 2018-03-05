@@ -4,6 +4,8 @@ GCUBE
 Open source Nintendo Gamecube emulator
 -----------------------------
 
+<img src="/screenshots/sms-02.jpg?raw=true" width="320">
+
 ![Super Mario Sunshine](/screenshots/sms-02.jpg?raw=true "Super Mario Sunshine")
 
 gcube is a gamecube emulator for linux, windows and mac os x.
