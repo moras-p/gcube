@@ -4,6 +4,8 @@ GCUBE
 Open source Nintendo Gamecube emulator
 -----------------------------
 
+![Alt text](/screenshots/ks.jpg?raw=true "Optional Title")
+
 gcube is a gamecube emulator for linux, windows and mac os x.
 Compatibility is still very low so don't expect much. It is not even a beta-quality product.
 It hasn't been thoroughly tested and may contain bugs. Patches and suggestions are always welcome.
