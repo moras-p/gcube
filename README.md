@@ -1,14 +1,14 @@
 GCUBE
 =====
 
-Open source Nintendo Gamecube emulator
+Open source Nintendo GameCube emulator
 -----------------------------
 
 <img src="/screenshots/sms-02.jpg?raw=true" width="320" title="Super Mario Sunshine">
 
-gcube is a gamecube emulator for linux, windows and mac os x.
-Compatibility is still very low so don't expect much. It is not even a beta-quality product.
-It hasn't been thoroughly tested and may contain bugs. Patches and suggestions are always welcome.
+GCube is a GameCube emulator for Linux, Windows and MacOS.
+This is an early beta quality product. It hasn't been thoroughly tested
+and may contain bugs. Patches and suggestions are always welcome.
 
 Software requirements
 ----------------------
